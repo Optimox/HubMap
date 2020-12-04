@@ -17,7 +17,7 @@ def plot_global_pred(mask, pred):
 def plot_thresh_scores(mask, pred):
     thresholds = []
     scores = []
-    for threshold in np.unique(pred)[:-1]:
+    for threshold in np.linspace(0, 0.95, 10):
         dice_score = dice_scores_img(pred = pred>threshold,
                                      truth=mask)
         thresholds.append(threshold)
