@@ -4,7 +4,8 @@ import cv2
 import numpy as np
 import tifffile as tiff
 import pandas as pd
-
+import rasterio
+from rasterio.windows import Window
 
 def load_image(img_path):
     """
@@ -63,7 +64,7 @@ class PredictFromImgDataset(Dataset):
     def __init__(self, original_img_path, mask_name=None,
                  overlap_factor = 1, tile_size=256, reduce_factor=4,
                  transforms=None):        
-        self.original_img = load_image(original_img_path)
+        self.original_img = rasterio.open(original_img_path)
         self.orig_size = self.original_img.shape
         self.raw_tile_size = tile_size
         self.reduce_factor = reduce_factor
@@ -119,11 +120,12 @@ class PredictFromImgDataset(Dataset):
 
     def __getitem__(self, idx):
         pos_x, pos_y = self.positions[idx]
-        img = self.original_img[pos_x[0]:pos_x[1],
-                                pos_y[0]:pos_y[1],
-                                :]
+        img = self.original_img.read([1,2,3],
+                                     window=Window.from_slices((pos_x[0],pos_x[1]),
+                                                               (pos_y[0],pos_y[1])))
+        img = np.moveaxis(img, 0, -1)
         # down scale to tile size
-        img = cv2.resize(img,(self.raw_tile_size, self.raw_tile_size),
+        img = cv2.resize(img, (self.raw_tile_size, self.raw_tile_size),
                          interpolation = cv2.INTER_AREA)
 
         if self.transforms:
