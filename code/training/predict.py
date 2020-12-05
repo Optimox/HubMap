@@ -27,7 +27,7 @@ def predict_entire_mask(predict_dataset, model, batch_size = 32):
     # Make all predictions by batch
     res = []
     model.eval()
-    for batch, _ in tqdm(predict_loader):
+    for batch in tqdm(predict_loader):
         raw_preds = model(batch.to("cuda"))
         b_size, C, H, W = raw_preds.shape
         upscale_preds = torch.nn.functional.interpolate(raw_preds,

@@ -125,18 +125,8 @@ class PredictFromImgDataset(Dataset):
         # down scale to tile size
         img = cv2.resize(img,(self.raw_tile_size, self.raw_tile_size),
                          interpolation = cv2.INTER_AREA)
-        if self.mask is not None:
-            msk = self.mask[pos_x[0]:pos_x[1],
-                            pos_y[0]:pos_y[1]]
-            # msk = cv2.resize(msk,(self.raw_tile_size, self.raw_tile_size),
-            #              interpolation = cv2.INTER_NEAREST)
+
         if self.transforms:
-            if self.mask is not None:
-                augmented = self.transforms(image=img, mask=msk)
-                img = augmented['image']
-                msk = augmented['mask']
-            else:
                 augmented = self.transforms(image=img)
                 img = augmented['image']
-                msk = None
-        return img, msk
+        return img
