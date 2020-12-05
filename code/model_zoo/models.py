@@ -6,7 +6,8 @@ DECODERS = ["Unet", "Linknet", "FPN", "PSPNet", "DeepLabV3", "DeepLabV3Plus", "P
 ENCODERS = list(encoders.keys())
 
 
-def define_model(decoder_name, encoder_name, num_classes=1, activation='sigmoid'):
+def define_model(decoder_name, encoder_name,
+                 num_classes=1, activation=None, pretrained='imagenet'):
     """
     Loads a segmentation architecture
 
@@ -14,7 +15,7 @@ def define_model(decoder_name, encoder_name, num_classes=1, activation='sigmoid'
         decoder_name (str): Decoder name.
         encoder_name (str): Encoder name.
         num_classes (int, optional): Number of classes. Defaults to 1.
-
+        pretrained : pretrained original weights
     Returns:
         torch model -- Pretrained model.
     """
@@ -25,7 +26,7 @@ def define_model(decoder_name, encoder_name, num_classes=1, activation='sigmoid'
 
     model = decoder(
         encoder_name,
-        encoder_weights='imagenet',
+        encoder_weights=pretrained,
         classes=num_classes,
         activation=activation
     )
