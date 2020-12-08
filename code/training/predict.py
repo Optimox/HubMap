@@ -34,8 +34,7 @@ def predict_entire_mask(predict_dataset, model, batch_size = 32, threshold=None)
         upscale_preds = torch.nn.functional.interpolate(raw_preds,
                                                         (H*reduce_fac, W*reduce_fac))
         preds = torch.sigmoid(upscale_preds) > 0.5
-        preds = preds.detach().cpu().squeeze().numpy().astype(np.uint8)
-
+        preds = preds.detach().cpu().squeeze(dim=1).numpy().astype(np.uint8)
         for b in range(preds.shape[0]):
             res.append(sparse.csr_matrix(preds[b,:,:]))
 
