@@ -5,24 +5,16 @@ from torchcontrib.optim import SWA
 from torch.utils.data import DataLoader
 from transformers import get_linear_schedule_with_warmup
 
-from params import NUM_WORKERS, SIZE
+from params import NUM_WORKERS
 from utils.logger import update_history
-from utils.metrics import SegmentationMetrics  ## noqa
-
-# from training.freeze import freeze_backbone, unfreeze
-from training.optim import (
-    define_loss,
-    define_optimizer,
-    prepare_for_loss,
-    average_loss
-)
+from training.meter import SegmentationMeter
+from training.optim import define_loss, define_optimizer, prepare_for_loss
 
 
 def fit(
     model,
     train_dataset,
     val_dataset,
-    mode="mask",
     optimizer_name="Adam",
     loss_name="BCEWithLogitsLoss",
     activation="sigmoid",
@@ -32,21 +24,17 @@ def fit(
     warmup_prop=0.1,
     lr=1e-3,
     swa_first_epoch=50,
-    num_classes=1,
-    use_haussdorf=False,
     verbose=1,
     first_epoch_eval=0,
     device="cuda"
 ):
     """
     Usual torch fit function.
-    Supports SWA.
 
     Args:
         model (torch model): Model to train.
         train_dataset (torch dataset): Dataset to train with.
         val_dataset (torch dataset): Dataset to validate with.
-        mode (str, optional): Indicates what the model is predicting. Defaults to "mask".
         optimizer_name (str, optional): Optimizer name. Defaults to 'adam'.
         loss_name (str, optional): Loss name. Defaults to 'BCEWithLogitsLoss'.
         activation (str, optional): Activation function. Defaults to 'sigmoid'.
@@ -56,8 +44,6 @@ def fit(
         warmup_prop (float, optional): Warmup proportion. Defaults to 0.1.
         lr (float, optional): Learning rate. Defaults to 1e-3.
         swa_first_epoch (int, optional): Epoch to start applying SWA from. Defaults to 50.
-        num_classes (int, optional): Number of classes. Defaults to 1.
-        use_haussdorf (bool, optional): Whether to use the haussdorf metric. Defaults to False.
         verbose (int, optional): Period (in epochs) to display logs at. Defaults to 1.
         first_epoch_eval (int, optional): Epoch to start evaluating at. Defaults to 0.
         device (str, optional): Device for torch. Defaults to "cuda".
@@ -93,6 +79,8 @@ def fit(
         pin_memory=True,
     )
 
+    meter = SegmentationMeter()
+
     num_warmup_steps = int(warmup_prop * epochs * len(train_loader))
     num_training_steps = int(epochs * len(train_loader))
     scheduler = get_linear_schedule_with_warmup(
@@ -109,18 +97,15 @@ def fit(
 
         if epoch + 1 > swa_first_epoch:
             optimizer.swap_swa_sgd()
-            # print("Swap to SGD")
 
-        for x, masks in train_loader:
-            x = x.type(torch.FloatTensor).to(device)
-            masks = masks.type(torch.FloatTensor).to(device)
+        for batch in train_loader:
+            x = batch[0].to(device).float()
+            y_batch = batch[1].float()
 
             y_pred = model(x)
-            y_pred, masks = prepare_for_loss(y_pred, masks, loss_name, mode=mode, device=device)
 
-            loss = loss_fct(y_pred, masks)
-
-            loss = average_loss(loss)
+            y_pred, y_batch = prepare_for_loss(y_pred, y_batch, loss_name, device=device)
+            loss = loss_fct(y_pred, y_batch).mean()
 
             loss.backward()
 
@@ -133,37 +118,37 @@ def fit(
                 param.grad = None
 
         if epoch + 1 >= swa_first_epoch:
-            # print("update + swap to SWA")
             optimizer.update_swa()
             optimizer.swap_swa_sgd()
 
         model.eval()
         avg_val_loss = 0.
-        meter = SegmentationMetrics()
+        meter.reset()
 
         if epoch + 1 >= first_epoch_eval:
             with torch.no_grad():
-                for x, masks in val_loader:
-                    x = x.type(torch.FloatTensor).to(device)
-                    masks = masks.type(torch.FloatTensor).to(device)
+                for batch in val_loader:
+                    x = batch[0].to(device).float()
+                    y_batch = batch[1].float()
 
                     y_pred = model(x)
 
                     y_pred, y_batch = prepare_for_loss(
                         y_pred,
-                        masks,
+                        y_batch,
                         loss_name,
                         device=device,
                         train=False
                     )
 
-                    loss = loss_fct(y_pred, y_batch)
-                    loss = average_loss(loss)
-
+                    loss = loss_fct(y_pred, y_batch).mean()
                     avg_val_loss += loss / len(val_loader)
 
                     if activation == "sigmoid":
                         y_pred = torch.sigmoid(y_pred)
+                    elif activation == "softmax":
+                        y_pred = torch.softmax(y_pred, 2)
+
                     meter.update(y_batch, y_pred)
 
         metrics = meter.compute()
@@ -178,14 +163,11 @@ def fit(
                 end="\t",
             )
             if epoch + 1 >= first_epoch_eval:
-                print(
-                    f"val_loss={avg_val_loss:.3f} \t dice={metrics['dice'][-1]:.4f}"
-                )
+                print(f"val_loss={avg_val_loss:.3f} \t dice={metrics['dice'][0]:.4f}")
             else:
                 print("")
             history = update_history(
-                history, metrics, epoch + 1, avg_loss,
-                avg_val_loss.detach().cpu().numpy(), elapsed_time
+                history, metrics, epoch + 1, avg_loss, avg_val_loss, elapsed_time
             )
 
     del val_loader, train_loader, y_pred, loss, x, y_batch

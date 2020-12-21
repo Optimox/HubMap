@@ -1,7 +1,7 @@
 import cv2
 import albumentations as albu
-from albumentations import pytorch as AT
 from albumentations.pytorch import ToTensorV2
+
 from params import MEAN, STD
 
 
@@ -131,28 +131,26 @@ def HE_preprocess(augment=True, visualize=False, mean=MEAN, std=STD):
         albumentation transforms: transforms.
     """
     if visualize:
-        normalizer =  albu.Compose([albu.Normalize(mean=[0,0,0],
-                                                   std=[1,1,1]),
-                                    ToTensorV2()],
-                                    p=1)
+        normalizer = albu.Compose(
+            [albu.Normalize(mean=[0, 0, 0], std=[1, 1, 1]), ToTensorV2()], p=1
+        )
     else:
-        normalizer = albu.Compose([albu.Normalize(mean=mean,
-                                                   std=std),
-                                    ToTensorV2()],
-                                  p=1)
+        normalizer = albu.Compose(
+            [albu.Normalize(mean=mean, std=std), ToTensorV2()], p=1
+        )
 
     if augment:
         return albu.Compose(
-            [   
+            [
                 albu.VerticalFlip(p=0.5),
                 albu.HorizontalFlip(p=0.5),
                 albu.ShiftScaleRotate(
-                    scale_limit=0.1, shift_limit=0.1, rotate_limit=0, p=0.5
+                    scale_limit=0.1, shift_limit=0.1, rotate_limit=45, p=0.5
                 ),
                 color_transforms(p=0.5),
-                noise_transforms(p=0.5),
-                blur_transforms(p=0.5),
-                dropout_transforms(p=0.5),
+                # noise_transforms(p=0.5),
+                # blur_transforms(p=0.5),
+                # dropout_transforms(p=0.5),
                 normalizer,
             ]
         )

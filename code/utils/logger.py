@@ -2,7 +2,6 @@ import os
 import sys
 import json
 import datetime
-import numpy as np
 import pandas as pd
 
 from params import LOG_PATH
@@ -131,15 +130,8 @@ def save_config(config, path):
     dic = config.__dict__.copy()
     del dic["__doc__"], dic["__module__"], dic["__dict__"], dic["__weakref__"]
 
-    with open(path + ".json", "w") as f:
+    with open(path, "w") as f:
         json.dump(dic, f)
-
-    dic["selected_folds"] = [", ".join(np.array(dic["selected_folds"]).astype(str))]
-
-    config_df = pd.DataFrame.from_dict(dic)
-    config_df.to_csv(path + ".csv", index=False)
-
-    return config_df
 
 
 def update_overall_logs(metrics, config_df, log_path):

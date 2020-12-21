@@ -6,8 +6,9 @@ DECODERS = ["Unet", "Linknet", "FPN", "PSPNet", "DeepLabV3", "DeepLabV3Plus", "P
 ENCODERS = list(encoders.keys())
 
 
-def define_model(decoder_name, encoder_name,
-                 num_classes=1, activation=None, pretrained='imagenet'):
+def define_model(
+    decoder_name, encoder_name, num_classes=1, activation=None, encoder_weights="imagenet"
+):
     """
     Loads a segmentation architecture
 
@@ -26,9 +27,9 @@ def define_model(decoder_name, encoder_name,
 
     model = decoder(
         encoder_name,
-        encoder_weights=pretrained,
+        encoder_weights=encoder_weights,
         classes=num_classes,
-        activation=activation
+        activation=activation,
     )
 
     return model

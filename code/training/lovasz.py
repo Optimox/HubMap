@@ -1,5 +1,8 @@
+# Adapted from https://github.com/bermanmaxim/LovaszSoftmax
+
 import torch
 import torch.nn.functional as F
+
 from torch.autograd import Variable
 
 
@@ -68,11 +71,14 @@ def symmetric_lovasz(outputs, targets):
 
 
 def lovasz_loss(x, y):
-    losses = []
+    """
+    Computes the symetric lovasz for each class.
 
-    for i in range(x.size(1)):
-        pred = x[:, i].unsqueeze(1)
-        truth = y[:, i].unsqueeze(1)
-        losses.append(symmetric_lovasz(pred, truth))
+    Args:
+        x (torch tensor [BS x H x W]): Logits.
+        y (torch tensor [BS x H x W]): Ground truth.
 
-    return torch.stack(losses).transpose(0, 1)
+    Returns:
+        torch tensor [BS]: Loss values.
+    """
+    return symmetric_lovasz(x, y)
