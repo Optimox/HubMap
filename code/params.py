@@ -10,6 +10,7 @@ REDUCE_FACTOR = 4
 
 DATA_PATH = "../input/"
 TIFF_PATH = DATA_PATH + "train/"
+TIFF_PATH_4 = DATA_PATH + "train_4/"
 
 LOG_PATH = "../logs/"
 OUT_PATH = "../output/"

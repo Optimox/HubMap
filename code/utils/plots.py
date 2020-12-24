@@ -1,6 +1,35 @@
-from matplotlib import pyplot as plt
-from utils.metrics import dice_scores_img
+import cv2
 import numpy as np
+
+from matplotlib import pyplot as plt
+
+from utils.metrics import dice_scores_img
+
+
+def plot_contours(img, mask, w=1):
+    """
+    Plots the contours of a given mask.
+
+    Args:
+        img (numpy array [H x W x C]): Image.
+        mask (numpy array [H x W]): Mask.
+        w (int, optional): Contour width. Defaults to 1.
+
+    Returns:
+        img (numpy array [H x W x C]): Image with contours.
+    """
+    if img.max() > 1:
+        img = (img / 255).astype(float)
+    if mask.max() > 1:
+        mask = (mask / 255).astype(float)
+    mask = (mask * 255).astype(np.uint8)
+
+    contours, _ = cv2.findContours(mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    cv2.polylines(img, contours, True, (0.7, 0., 0.), w)
+
+    plt.imshow(img)
+
+    return img
 
 
 def plot_global_pred(mask, pred):

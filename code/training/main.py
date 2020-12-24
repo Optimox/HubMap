@@ -1,6 +1,7 @@
 import gc
 import torch
 import numpy as np
+import pandas as pd
 
 from training.train import fit
 from data.dataset import TileDataset, InferenceDataset
@@ -9,8 +10,8 @@ from model_zoo.models import define_model
 from utils.save import save_as_jit
 from utils.torch import seed_everything, count_parameters, save_model_weights
 
-from params import REDUCE_FACTOR, SIZE
-from training.predict import predict_entire_mask
+from params import REDUCE_FACTOR, SIZE, TIFF_PATH_4, DATA_PATH, TIFF_PATH  # noqa
+from training.predict import predict_entire_mask_no_thresholding
 from utils.plots import plot_thresh_scores
 
 
@@ -85,36 +86,56 @@ def train(config, df_train, df_val, fold, log_folder=None):
             name,
             cp_folder=log_folder,
         )
-        save_as_jit(model, log_folder, name, train_img_size=SIZE)
+        if "efficientnet" not in name:
+            save_as_jit(model, log_folder, name, train_img_size=SIZE)
 
     return meter, history, model
 
 
-def validate(model, config, val_images, log_folder=''):
-    print('\n    -> Validating \n')
+def validate(model, config, val_images, log_folder=None, use_full_size=True):
+    if use_full_size:
+        root = TIFF_PATH
+        rle_path = DATA_PATH + "train.csv"
+        reduce_factor = REDUCE_FACTOR
+        batch_size = config.val_bs // 4
+    else:
+        root = TIFF_PATH_4
+        rle_path = DATA_PATH + "train_4.csv"
+        reduce_factor = 1
+        batch_size = config.val_bs // 4
+
+    rles = pd.read_csv(rle_path)
+
+    print("\n    -> Validating \n")
+    scores = []
+    thresholds = []
 
     for img in val_images:
 
         predict_dataset = InferenceDataset(
-            f"../input/train/{img}.tiff",
-            mask_name=img,
+            f"{root}/{img}.tiff",
+            rle=rles[rles['id'] == img]["encoding"],
             overlap_factor=config.overlap_factor,
-            reduce_factor=REDUCE_FACTOR,
+            reduce_factor=reduce_factor,
             transforms=HE_preprocess(augment=False, visualize=False),
         )
 
-        global_pred = predict_entire_mask(
-            predict_dataset, model, batch_size=config.val_bs // 2
+        global_pred = predict_entire_mask_no_thresholding(
+            predict_dataset, model, batch_size=batch_size, upscale=use_full_size
         )
 
         threshold, score = plot_thresh_scores(
             mask=predict_dataset.mask, pred=global_pred, plot=False
         )
+        thresholds.append(threshold)
+        scores.append(scores)
 
         if log_folder is not None:
             np.save(log_folder + f"global_pred_{img}.npy", global_pred)
 
         print(f" - Scored {score :.4f} for image {img} with threshold {threshold:.2f}")
+
+    return scores, thresholds
 
 
 def k_fold(config, df, log_folder=None):
@@ -143,7 +164,13 @@ def k_fold(config, df, log_folder=None):
             cvs.append(history.dice.values[-1])
 
             val_images = df_val["tile_name"].apply(lambda x: x.split("_")[0]).unique()
-            validate(model, config, val_images)
+            validate(
+                model,
+                config,
+                val_images,
+                log_folder=log_folder,
+                use_full_size=False
+            )
 
             del model
             torch.cuda.empty_cache()

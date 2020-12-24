@@ -4,37 +4,77 @@ from torch.utils.data import DataLoader
 from scipy import sparse
 
 
-def rle_encode_less_memory(mask):
-    """
-    From https://www.kaggle.com/bguberfain/memory-aware-rle-encoding
-    mask: numpy array, 1 - mask, 0 - background
-    Returns run length as string formated
-    This simplified method requires first and last pixel to be zero
-    """
-    pixels = mask.T.flatten()
+def get_tile_weighting(size, sigma=1):
+    half = size // 2
+    w = np.ones((size, size), np.float32)
 
-    # This simplified method requires first and last pixel to be zero
-    pixels[0] = 0
-    pixels[-1] = 0
-    runs = np.where(pixels[1:] != pixels[:-1])[0] + 2
-    runs[1::2] -= runs[::2]
+    x = np.concatenate([np.mgrid[-half:0], np.mgrid[1: half + 1]])[:, None]
+    x = np.tile(x, (1, size))
+    x = half + 1 - np.abs(x)
+    y = x.T
 
-    return " ".join(str(x) for x in runs)
+    w = np.minimum(x, y)
+    w = (w / w.max()) ** sigma
+    w = np.minimum(w, 1)
+
+    return w.astype(np.float16)
 
 
-def predict_entire_mask(predict_dataset, model, batch_size=32):
+def predict_entire_mask_no_thresholding(dataset, model, batch_size=32, upscale=True):
+
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
+    w = get_tile_weighting(dataset.tile_size, sigma=1)
+
+    preds = []
+    model.eval()
+    for batch in loader:
+        pred = model(batch.to("cuda"))
+        if upscale:
+            _, _, H, W = preds.shape
+            pred = torch.nn.functional.interpolate(
+                preds, (H * dataset.reduce_factor, W * dataset.reduce_factor)
+            )
+
+        pred = pred.sigmoid().detach().cpu().squeeze()
+        preds.append(pred)
+
+    preds = torch.cat(preds)
+
+    global_pred = np.zeros(
+        (dataset.orig_size[0], dataset.orig_size[1]), dtype=np.float16
+    )
+    global_counter = np.zeros(
+        (dataset.orig_size[0], dataset.orig_size[1]), dtype=np.float16
+    )
+
+    for tile_idx, (pos_x, pos_y) in enumerate(dataset.positions):
+        global_pred[pos_x[0]: pos_x[1], pos_y[0]: pos_y[1]] += (
+            preds[tile_idx, :, :].numpy().astype(np.float16) * w
+        )
+        global_counter[pos_x[0]: pos_x[1], pos_y[0]: pos_y[1]] += w
+
+    # divide by overlapping tiles
+    global_pred = np.divide(global_pred, global_counter).astype(np.float16)
+
+    return global_pred
+
+
+def predict_entire_mask(predict_dataset, model, batch_size=32, upscale=True):
     reduce_fac = predict_dataset.reduce_factor
     predict_loader = DataLoader(predict_dataset, batch_size=batch_size, shuffle=False)
     # Make all predictions by batch
     res = []
     model.eval()
     for batch in predict_loader:
-        raw_preds = model(batch.to("cuda"))
-        b_size, C, H, W = raw_preds.shape
-        upscale_preds = torch.nn.functional.interpolate(
-            raw_preds, (H * reduce_fac, W * reduce_fac)
-        )
-        preds = torch.sigmoid(upscale_preds) > 0.5
+        preds = model(batch.to("cuda"))
+        b_size, C, H, W = preds.shape
+
+        if upscale:
+            preds = torch.nn.functional.interpolate(
+                preds, (H * reduce_fac, W * reduce_fac)
+            )
+
+        preds = torch.sigmoid(preds) > 0.5
         preds = preds.detach().cpu().squeeze().type(torch.int8)
         res.append(preds)
 

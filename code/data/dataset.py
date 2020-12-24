@@ -1,16 +1,18 @@
-from torch.utils.data import Dataset
 import os
 import cv2
-import numpy as np
-import tifffile as tiff
-import pandas as pd
 import rasterio
+import numpy as np
+import pandas as pd
+import tifffile as tiff
+
 from rasterio.windows import Window
+from torch.utils.data import Dataset
 
 from params import DATA_PATH
+from utils.rle import enc2mask
 
 
-def load_image(img_path):
+def load_image(img_path, full_size=True):
     """
     Load image and make sure sizes matches df_info
     """
@@ -18,6 +20,11 @@ def load_image(img_path):
     image_fname = img_path.rsplit("/", -1)[-1]
     W = int(df_info[df_info.image_file == image_fname]["width_pixels"])
     H = int(df_info[df_info.image_file == image_fname]["height_pixels"])
+
+    if not full_size:
+        W = W // 4
+        H = H // 4
+
     img = tiff.imread(img_path).squeeze()
 
     channel_pos = np.argwhere(np.array(img.shape) == 3)[0][0]
@@ -55,7 +62,6 @@ class TileDataset(Dataset):
         img = cv2.cvtColor(
             cv2.imread(os.path.join(self.img_dir, tile_name)), cv2.COLOR_BGR2RGB
         )
-        # img = cv2.imread(os.path.join(self.img_dir, tile_name))
 
         mask = cv2.imread(os.path.join(self.mask_dir, tile_name), cv2.IMREAD_GRAYSCALE)
 
@@ -160,24 +166,26 @@ class InferenceDataset(Dataset):
     def __init__(
         self,
         original_img_path,
-        mask_name=None,
+        rle=None,
         overlap_factor=1,
         tile_size=256,
         reduce_factor=4,
         transforms=None,
     ):
-        self.original_img = load_image(original_img_path)
+        self.original_img = load_image(original_img_path, full_size=reduce_factor > 1)
         self.orig_size = self.original_img.shape
+
         self.raw_tile_size = tile_size
         self.reduce_factor = reduce_factor
         self.tile_size = tile_size * reduce_factor
+
         self.overlap_factor = overlap_factor
+
         self.positions = self.get_positions()
         self.transforms = transforms
-        if mask_name is not None:
-            df_mask = pd.read_csv(DATA_PATH + "train.csv")
-            self.msk_encoding = df_mask[df_mask.id == mask_name].encoding
-            self.mask = self.enc2mask()
+
+        if rle is not None:
+            self.mask = enc2mask(rle, (self.orig_size[1], self.orig_size[0])) > 0
         else:
             self.mask = None
 
@@ -210,29 +218,21 @@ class InferenceDataset(Dataset):
                 else:
                     boundaries_y = (y + down_space, y + down_space + self.tile_size)
                 starting_positions.append((boundaries_x, boundaries_y))
-        return starting_positions
 
-    def enc2mask(self):
-        msk = np.zeros(self.orig_size[0] * self.orig_size[1], dtype=np.uint8)
-        for m, enc in enumerate(self.msk_encoding):
-            if isinstance(enc, np.float) and np.isnan(enc):
-                continue
-            enc_split = enc.split()
-            for i in range(len(enc_split) // 2):
-                start = int(enc_split[2 * i]) - 1
-                length = int(enc_split[2 * i + 1])
-                msk[start: start + length] = 1 + m
-        return msk.reshape((self.orig_size[1], self.orig_size[0])).T > 0
+        return starting_positions
 
     def __getitem__(self, idx):
         pos_x, pos_y = self.positions[idx]
         img = self.original_img[pos_x[0]: pos_x[1], pos_y[0]: pos_y[1], :]
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  ???
+
         # down scale to tile size
-        img = cv2.resize(
-            img, (self.raw_tile_size, self.raw_tile_size), interpolation=cv2.INTER_AREA
-        )
+        if self.reduce_factor > 1:
+            img = cv2.resize(
+                img, (self.raw_tile_size, self.raw_tile_size), interpolation=cv2.INTER_AREA
+            )
 
         if self.transforms:
-            augmented = self.transforms(image=img)
-            img = augmented["image"]
+            img = self.transforms(image=img)["image"]
+
         return img
