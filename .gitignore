@@ -6,9 +6,11 @@ external_code/
 output/
 input/
 models/
+logs/ 
 .ipynb_checkpoints/
 *.pt
 *~
+*.npy
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
