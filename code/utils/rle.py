@@ -13,18 +13,6 @@ def enc2mask(encs, shape):
             img[start: start + length] = 1 + m
     return img.reshape(shape).T
 
-    def enc2mask(self):
-        msk = np.zeros(self.orig_size[0] * self.orig_size[1], dtype=np.uint8)
-        for m, enc in enumerate(encs):
-            if isinstance(enc, np.float) and np.isnan(enc):
-                continue
-            enc_split = enc.split()
-            for i in range(len(enc_split) // 2):
-                start = int(enc_split[2 * i]) - 1
-                length = int(enc_split[2 * i + 1])
-                msk[start: start + length] = 1 + m
-        return msk.reshape((self.orig_size[1], self.orig_size[0])).T > 0
-
 
 def mask2enc(mask, n=1):
     pixels = mask.T.flatten()

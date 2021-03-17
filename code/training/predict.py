@@ -1,7 +1,20 @@
+import cv2
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
 from scipy import sparse
+
+
+def threshold_resize(preds, shape, threshold=0.5):
+    preds = (preds > threshold).astype(np.uint8)
+
+    preds = cv2.resize(
+        preds,
+        (shape[0], shape[1]),
+        interpolation=cv2.INTER_AREA,
+    )
+
+    return preds
 
 
 def get_tile_weighting(size, sigma=1):
@@ -27,18 +40,19 @@ def predict_entire_mask_no_thresholding(dataset, model, batch_size=32, upscale=T
 
     preds = []
     model.eval()
-    for batch in loader:
-        pred = model(batch.to("cuda"))
-        if upscale:
-            _, _, H, W = preds.shape
-            pred = torch.nn.functional.interpolate(
-                preds, (H * dataset.reduce_factor, W * dataset.reduce_factor)
-            )
+    with torch.no_grad():
+        for batch in loader:
+            pred = model(batch.to("cuda"))
+            _, _, h, w = pred.shape
+            if upscale:
+                pred = torch.nn.functional.interpolate(
+                    pred, (h * dataset.reduce_factor, w * dataset.reduce_factor)
+                )
 
-        pred = pred.sigmoid().detach().cpu().squeeze()
-        preds.append(pred)
+            pred = pred.sigmoid().detach().cpu().view(-1, h, w).numpy().astype(np.float16)
+            preds.append(pred)
 
-    preds = torch.cat(preds)
+    preds = np.concatenate(preds)
 
     global_pred = np.zeros(
         (dataset.orig_size[0], dataset.orig_size[1]), dtype=np.float16
@@ -48,12 +62,9 @@ def predict_entire_mask_no_thresholding(dataset, model, batch_size=32, upscale=T
     )
 
     for tile_idx, (pos_x, pos_y) in enumerate(dataset.positions):
-        global_pred[pos_x[0]: pos_x[1], pos_y[0]: pos_y[1]] += (
-            preds[tile_idx, :, :].numpy().astype(np.float16) * w
-        )
+        global_pred[pos_x[0]: pos_x[1], pos_y[0]: pos_y[1]] += preds[tile_idx, :, :] * w
         global_counter[pos_x[0]: pos_x[1], pos_y[0]: pos_y[1]] += w
 
-    # divide by overlapping tiles
     global_pred = np.divide(global_pred, global_counter).astype(np.float16)
 
     return global_pred
@@ -65,18 +76,19 @@ def predict_entire_mask(predict_dataset, model, batch_size=32, upscale=True):
     # Make all predictions by batch
     res = []
     model.eval()
-    for batch in predict_loader:
-        preds = model(batch.to("cuda"))
-        b_size, C, H, W = preds.shape
+    with torch.no_grad():
+        for batch in predict_loader:
+            preds = model(batch.to("cuda"))
+            b_size, C, H, W = preds.shape
 
-        if upscale:
-            preds = torch.nn.functional.interpolate(
-                preds, (H * reduce_fac, W * reduce_fac)
-            )
+            if upscale:
+                preds = torch.nn.functional.interpolate(
+                    preds, (H * reduce_fac, W * reduce_fac)
+                )
 
-        preds = torch.sigmoid(preds) > 0.5
-        preds = preds.detach().cpu().squeeze().type(torch.int8)
-        res.append(preds)
+            preds = torch.sigmoid(preds) > 0.5
+            preds = preds.detach().cpu().squeeze().type(torch.int8)
+            res.append(preds)
 
     # reconstruct spatial positions
     preds_tensor = torch.cat(res).type(torch.int8)

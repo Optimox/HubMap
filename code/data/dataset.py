@@ -8,8 +8,9 @@ import tifffile as tiff
 from rasterio.windows import Window
 from torch.utils.data import Dataset
 
-from params import DATA_PATH
+from params import DATA_PATH, LAB_STATS  # noqa
 from utils.rle import enc2mask
+from data.transforms import lab_normalization  # noqa
 
 
 def load_image(img_path, full_size=True):
@@ -62,6 +63,9 @@ class TileDataset(Dataset):
         img = cv2.cvtColor(
             cv2.imread(os.path.join(self.img_dir, tile_name)), cv2.COLOR_BGR2RGB
         )
+
+        # mean, std = LAB_STATS[tile_name.split("_")[0]]
+        # img = lab_normalization(img, mean=mean, std=std)
 
         mask = cv2.imread(os.path.join(self.mask_dir, tile_name), cv2.IMREAD_GRAYSCALE)
 
@@ -173,6 +177,9 @@ class InferenceDataset(Dataset):
         transforms=None,
     ):
         self.original_img = load_image(original_img_path, full_size=reduce_factor > 1)
+
+        # self.original_img = lab_normalization(self.original_img)
+
         self.orig_size = self.original_img.shape
 
         self.raw_tile_size = tile_size
@@ -224,7 +231,8 @@ class InferenceDataset(Dataset):
     def __getitem__(self, idx):
         pos_x, pos_y = self.positions[idx]
         img = self.original_img[pos_x[0]: pos_x[1], pos_y[0]: pos_y[1], :]
-        # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)  ???
+
+        # img = lab_normalization(img)
 
         # down scale to tile size
         if self.reduce_factor > 1:
