@@ -40,17 +40,15 @@ def predict_entire_mask_no_thresholding(dataset, model, batch_size=32, upscale=T
 
     preds = []
     model.eval()
-    with torch.no_grad():
-        for batch in loader:
-            pred = model(batch.to("cuda"))
-            _, _, h, w = pred.shape
-            if upscale:
-                pred = torch.nn.functional.interpolate(
-                    pred, (h * dataset.reduce_factor, w * dataset.reduce_factor)
-                )
-
-            pred = pred.sigmoid().detach().cpu().view(-1, h, w).numpy().astype(np.float16)
-            preds.append(pred)
+    for batch in loader:
+        pred = model(batch.to("cuda"))
+        if upscale:
+            _, _, H, W = batch.shape
+            pred = torch.nn.functional.interpolate(
+                preds, (H * dataset.reduce_factor, W * dataset.reduce_factor)
+            )
+        pred = pred.sigmoid().detach().cpu().squeeze(1).numpy().astype(np.float16)
+        preds.append(pred)
 
     preds = np.concatenate(preds)
 
