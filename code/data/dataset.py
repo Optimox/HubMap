@@ -65,7 +65,7 @@ class TileDataset(Dataset):
         )
 
         # mean, std = LAB_STATS[tile_name.split("_")[0]]
-        # img = lab_normalization(img, mean=mean, std=std)
+        # img = lab_normalization(img)  # , mean=mean, std=std)
 
         mask = cv2.imread(os.path.join(self.mask_dir, tile_name), cv2.IMREAD_GRAYSCALE)
 
@@ -177,10 +177,9 @@ class InferenceDataset(Dataset):
         transforms=None,
     ):
         self.original_img = load_image(original_img_path, full_size=reduce_factor > 1)
+        self.orig_size = self.original_img.shape
 
         # self.original_img = lab_normalization(self.original_img)
-
-        self.orig_size = self.original_img.shape
 
         self.raw_tile_size = tile_size
         self.reduce_factor = reduce_factor
@@ -243,4 +242,6 @@ class InferenceDataset(Dataset):
         if self.transforms:
             img = self.transforms(image=img)["image"]
 
-        return img
+        pos = np.array([pos_x[0], pos_x[1], pos_y[0], pos_y[1]])
+
+        return img, pos
