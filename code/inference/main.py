@@ -1,11 +1,10 @@
 import torch
 import pandas as pd
 
-
-from training.predict import (  # noqa
-    predict_entire_mask_no_thresholding,
-    threshold_resize,
-    threshold_resize_torch
+from training.predict import (
+    predict_entire_mask_downscaled,
+    predict_entire_mask,
+    threshold_resize_torch,
 )
 
 from model_zoo.models import define_model
@@ -16,7 +15,7 @@ from data.transforms import HE_preprocess
 from utils.rle import enc2mask
 from utils.torch import load_model_weights
 from utils.metrics import dice_scores_img, tweak_threshold
-# from utils.plots import plot_thresh_scores
+
 from params import TIFF_PATH, DATA_PATH, REDUCE_FACTOR, TIFF_PATH_4
 
 
@@ -27,6 +26,7 @@ def validate_inf(
     log_folder=None,
     use_full_size=True,
     global_threshold=None,
+    use_tta=False,
 ):
     df_info = pd.read_csv(DATA_PATH + "HuBMAP-20-dataset_information.csv")
 
@@ -34,12 +34,10 @@ def validate_inf(
         root = TIFF_PATH
         rle_path = DATA_PATH + "train.csv"
         reduce_factor = REDUCE_FACTOR
-        batch_size = config.val_bs // 4
     else:
         root = TIFF_PATH_4
         rle_path = DATA_PATH + "train_4.csv"
         reduce_factor = 1
-        batch_size = config.val_bs // 4
 
     rles = pd.read_csv(rle_path)
     rles_full = pd.read_csv(DATA_PATH + "train.csv")
@@ -57,16 +55,23 @@ def validate_inf(
             transforms=HE_preprocess(augment=False, visualize=False),
         )
 
-        global_pred = predict_entire_mask_no_thresholding(
-            predict_dataset, model, batch_size=batch_size, upscale=use_full_size
-        )
+        if use_full_size:
+            global_pred = predict_entire_mask(
+                predict_dataset, model, batch_size=config.val_bs, tta=use_tta
+            )
+            threshold, score = 0.4, 0
 
-        threshold, score = tweak_threshold(
-            mask=torch.from_numpy(predict_dataset.mask).cuda(),
-            pred=global_pred
-        )
+        else:
+            global_pred = predict_entire_mask_downscaled(
+                predict_dataset, model, batch_size=config.val_bs, tta=use_tta
+            )
 
-        print(f" - Scored {score :.4f} for image {img} with threshold {threshold:.2f}")
+            threshold, score = tweak_threshold(
+                mask=torch.from_numpy(predict_dataset.mask).cuda(), pred=global_pred
+            )
+            print(
+                f" - Scored {score :.4f} for downscaled image {img} with threshold {threshold:.2f}"
+            )
 
         shape = df_info[df_info.image_file == img + ".tiff"][
             ["width_pixels", "height_pixels"]
@@ -76,20 +81,32 @@ def validate_inf(
         global_threshold = (
             global_threshold if global_threshold is not None else threshold
         )
-        global_pred = threshold_resize(global_pred.cpu().numpy(), shape, threshold=global_threshold)
+
+        if not use_full_size:
+            global_pred = threshold_resize_torch(
+                global_pred, shape, threshold=global_threshold
+            )
+        else:
+            global_pred = (global_pred > global_threshold).cpu().numpy()
 
         score = dice_scores_img(global_pred, mask_truth)
         scores.append(score)
 
         print(
-            f" - Scored {score :.4f} for image {img} "
-            f"with threshold {global_threshold:.2f} after resizing\n"
+            f" - Scored {score :.4f} for image {img} with threshold {global_threshold:.2f}\n"
         )
 
     return scores
 
 
-def k_fold_inf(config, df, log_folder=None, use_full_size=True, global_threshold=None):
+def k_fold_inf(
+    config,
+    df,
+    log_folder=None,
+    use_full_size=True,
+    global_threshold=None,
+    use_tta=False,
+):
     """
     Performs a patient grouped k-fold cross validation.
     The following things are saved to the log folder : val predictions, val indices, histories
@@ -116,6 +133,7 @@ def k_fold_inf(config, df, log_folder=None, use_full_size=True, global_threshold
                 encoder_weights=config.encoder_weights,
             ).to(config.device)
             model.zero_grad()
+            model.eval()
 
             load_model_weights(
                 model, log_folder + f"{config.decoder}_{config.encoder}_{i}.pt"
@@ -128,7 +146,9 @@ def k_fold_inf(config, df, log_folder=None, use_full_size=True, global_threshold
                 log_folder=log_folder,
                 use_full_size=use_full_size,
                 global_threshold=global_threshold,
+                use_tta=use_tta,
             )
-            break
+
+            # break
 
     return scores

@@ -3,6 +3,8 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 
+FLIPS = [[-1], [-2], [-2, -1]]
+
 
 def threshold_resize(preds, shape, threshold=0.5):
 
@@ -20,9 +22,9 @@ def threshold_resize(preds, shape, threshold=0.5):
 def threshold_resize_torch(preds, shape, threshold=0.5):
     preds = preds.unsqueeze(0).unsqueeze(0)
     preds = torch.nn.functional.interpolate(
-        preds, (shape[0], shape[1]), mode='area'
+        preds, (shape[1], shape[0]), mode='area'
     )
-    return preds.numpy()[0, 0] > threshold
+    return (preds > threshold).cpu().numpy()[0, 0]
 
 
 def get_tile_weighting(size, sigma=1, alpha=1, eps=1e-6):
@@ -48,7 +50,7 @@ def get_tile_weighting(size, sigma=1, alpha=1, eps=1e-6):
     return w.astype(np.float16)
 
 
-def predict_entire_mask_no_thresholding(dataset, model, batch_size=32, upscale=True):
+def predict_entire_mask_downscaled(dataset, model, batch_size=32, tta=False):
 
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
 
@@ -63,21 +65,71 @@ def predict_entire_mask_no_thresholding(dataset, model, batch_size=32, upscale=T
     global_counter = torch.zeros(
         (dataset.orig_size[0], dataset.orig_size[1]),
         dtype=torch.half, device="cuda"
-    ).half().cuda()
+    )
 
     model.eval()
     with torch.no_grad():
         for img, pos in loader:
+            img = img.to("cuda")
+            _, _, h, w = img.shape
 
-            pred = model(img.to("cuda"))
-            _, _, h, w = pred.shape
+            pred = model(img).view(-1, h, w).sigmoid().detach()
 
-            if upscale:
-                pred = torch.nn.functional.interpolate(
-                    pred, (h * dataset.reduce_factor, w * dataset.reduce_factor)
-                )
+            if tta:
+                for f in FLIPS:
+                    pred_flip = model(torch.flip(img, f))
+                    pred_flip = torch.flip(pred_flip, f).view(-1, h, w).sigmoid().detach()
+                    pred += pred_flip
+                pred = torch.div(pred, len(FLIPS) + 1)
 
-            pred = (pred.view(-1, h, w).sigmoid().detach() * weighting_cuda).half()
+            pred = (pred * weighting_cuda).half()
+
+            for tile_idx, (x0, x1, y0, y1) in enumerate(pos):
+                global_pred[x0: x1, y0: y1] += pred[tile_idx]
+                global_counter[x0: x1, y0: y1] += weighting
+
+    for i in range(len(global_pred)):
+        global_pred[i] = torch.div(global_pred[i], global_counter[i])
+
+    return global_pred
+
+
+def predict_entire_mask(dataset, model, batch_size=32, tta=False):
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
+
+    weighting = torch.from_numpy(get_tile_weighting(dataset.tile_size, sigma=1, alpha=1))
+    weighting_cuda = weighting.clone().cuda().unsqueeze(0)
+    weighting = weighting.cuda().half()
+
+    global_pred = torch.zeros(
+        (dataset.orig_size[0], dataset.orig_size[1]),
+        dtype=torch.half, device="cuda"
+    )
+    global_counter = torch.zeros(
+        (dataset.orig_size[0], dataset.orig_size[1]),
+        dtype=torch.half, device="cuda"
+    )
+
+    model.eval()
+    with torch.no_grad():
+        for img, pos in loader:
+            img = img.to("cuda")
+            _, _, h, w = img.shape
+
+            pred = model(img).view(-1, 1, h, w).sigmoid().detach()
+
+            if tta:
+                for f in FLIPS:
+                    pred_flip = model(torch.flip(img, f))
+                    pred_flip = torch.flip(pred_flip, f).view(-1, 1, h, w).sigmoid().detach()
+                    pred += pred_flip
+                pred = torch.div(pred, len(FLIPS) + 1)
+
+            pred = torch.nn.functional.interpolate(
+                pred, (dataset.tile_size, dataset.tile_size), mode='area'
+            ).view(-1, dataset.tile_size, dataset.tile_size)
+
+            pred = (pred * weighting_cuda).half()
 
             for tile_idx, (x0, x1, y0, y1) in enumerate(pos):
                 global_pred[x0: x1, y0: y1] += pred[tile_idx]
