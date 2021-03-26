@@ -10,9 +10,9 @@ from model_zoo.models import define_model
 from utils.save import save_as_jit
 from utils.torch import seed_everything, count_parameters, save_model_weights
 
-from params import REDUCE_FACTOR, SIZE, TIFF_PATH_4, DATA_PATH, TIFF_PATH  # noqa
-from training.predict import predict_entire_mask_no_thresholding
-from utils.plots import plot_thresh_scores
+from params import SIZE, TIFF_PATH_4, DATA_PATH
+from training.predict import predict_entire_mask_downscaled
+from utils.metrics import tweak_threshold
 
 
 def train(config, df_train, df_val, fold, log_folder=None):
@@ -92,56 +92,48 @@ def train(config, df_train, df_val, fold, log_folder=None):
     return meter, history, model
 
 
-def validate(model, config, val_images, log_folder=None, use_full_size=True):
-    if use_full_size:
-        root = TIFF_PATH
-        rle_path = DATA_PATH + "train.csv"
-        reduce_factor = REDUCE_FACTOR
-        batch_size = config.val_bs // 4
-    else:
-        root = TIFF_PATH_4
-        rle_path = DATA_PATH + "train_4.csv"
-        reduce_factor = 1
-        batch_size = config.val_bs // 4
+def validate(model, config, val_images):
+    """
+    Quick model validation on full images.
+    Validation is performed on downscaled images.
 
-    rles = pd.read_csv(rle_path)
-
-    print("\n    -> Validating \n")
+    Args:
+        model ([type]): Trained model.
+        config ([type]): Model config.
+        val_images (list]): Validation image ids.
+    """
+    rles = pd.read_csv(DATA_PATH + "train_4.csv")
     scores = []
-    thresholds = []
-
     for img in val_images:
 
         predict_dataset = InferenceDataset(
-            f"{root}/{img}.tiff",
-            rle=rles[rles['id'] == img]["encoding"],
+            f"{TIFF_PATH_4}/{img}.tiff",
+            rle=rles[rles["id"] == img]["encoding"],
             overlap_factor=config.overlap_factor,
-            reduce_factor=reduce_factor,
+            reduce_factor=1,
             transforms=HE_preprocess(augment=False, visualize=False),
         )
 
-        global_pred = predict_entire_mask_no_thresholding(
-            predict_dataset, model, batch_size=batch_size, upscale=use_full_size
+        global_pred = predict_entire_mask_downscaled(
+            predict_dataset, model, batch_size=config.val_bs, tta=False
         )
 
-        threshold, score = plot_thresh_scores(
-            mask=predict_dataset.mask, pred=global_pred, plot=False
+        threshold, score = tweak_threshold(
+            mask=torch.from_numpy(predict_dataset.mask).cuda(), pred=global_pred
         )
-        thresholds.append(threshold)
-        scores.append(scores)
 
-        if log_folder is not None:
-            np.save(log_folder + f"global_pred_{img}.npy", global_pred)
+        scores.append(score)
+        print(
+            f" - Scored {score :.4f} for downscaled image {img} with threshold {threshold:.2f}"
+        )
 
-        print(f" - Scored {score :.4f} for image {img} with threshold {threshold:.2f}")
-
-    return scores, thresholds
+    return scores
 
 
 def k_fold(config, df, log_folder=None):
     """
     Performs a patient grouped k-fold cross validation.
-    The following things are saved to the log folder : val predictions, val indices, histories
+    The following things are saved to the log folder : val predictions, histories
 
     Args:
         config (Config): Parameters.
@@ -149,7 +141,7 @@ def k_fold(config, df, log_folder=None):
         log_folder (None or str, optional): Folder to logs results to. Defaults to None.
     """
     folds = df[config.cv_column].unique()
-    cvs = []
+    scores = []
 
     for i, fold in enumerate(folds):
         if i in config.selected_folds:
@@ -161,28 +153,20 @@ def k_fold(config, df, log_folder=None):
             meter, history, model = train(
                 config, df_train, df_val, i, log_folder=log_folder
             )
-            cvs.append(history.dice.values[-1])
 
-            val_images = df_val["tile_name"].apply(lambda x: x.split("_")[0]).unique()
-            validate(
-                model,
-                config,
-                val_images,
-                log_folder=log_folder,
-                use_full_size=False
-            )
+            print("\n    -> Validating \n")
 
-            del model
-            torch.cuda.empty_cache()
+            val_images = df_val["tile_name"].apply(lambda x: x.split("_")[0]).unique()[:1]
+            scores += validate(model, config, val_images)
 
             if log_folder is not None:
-                np.save(log_folder + f"pred_mask_{i}.npy", meter.pred_mask)
                 history.to_csv(log_folder + f"history_{i}.csv", index=False)
 
             if log_folder is None or len(config.selected_folds) == 1:
                 return meter
 
-            del meter
+            del meter, model
+            torch.cuda.empty_cache()
             gc.collect()
 
-    print(f"\n  -> Average Dice CV : {np.mean(cvs)}  (std : {np.std(cvs)})")
+    print(f"\n\n  ->  Dice CV : {np.mean(scores) :.3f}  +/- {np.std(scores) :.3f}")
