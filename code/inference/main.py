@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import pandas as pd
 
 from training.predict import (
@@ -27,6 +28,7 @@ def validate_inf(
     use_full_size=True,
     global_threshold=None,
     use_tta=False,
+    save=False
 ):
     df_info = pd.read_csv(DATA_PATH + "HuBMAP-20-dataset_information.csv")
 
@@ -82,6 +84,12 @@ def validate_inf(
             global_threshold if global_threshold is not None else threshold
         )
 
+        if save:
+            np.save(
+                log_folder + f"pred_{img}.npy",
+                global_pred.cpu().numpy()
+            )
+
         if not use_full_size:
             global_pred = threshold_resize_torch(
                 global_pred, shape, threshold=global_threshold
@@ -106,11 +114,9 @@ def k_fold_inf(
     use_full_size=True,
     global_threshold=None,
     use_tta=False,
+    save=False,
 ):
     """
-    Performs a patient grouped k-fold cross validation.
-    The following things are saved to the log folder : val predictions, val indices, histories
-
     Args:
         config (Config): Parameters.
         df (pandas dataframe): Metadata.
@@ -147,6 +153,7 @@ def k_fold_inf(
                 use_full_size=use_full_size,
                 global_threshold=global_threshold,
                 use_tta=use_tta,
+                save=save,
             )
 
             # break
