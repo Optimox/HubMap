@@ -8,6 +8,7 @@ output/
 input/
 models/
 logs/
+.vscode
 **/__pycache__/ 
 .ipynb_checkpoints/
 *.pt
