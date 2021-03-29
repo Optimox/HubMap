@@ -13,7 +13,7 @@ from utils.rle import enc2mask
 from data.transforms import lab_normalization  # noqa
 from skimage.morphology import convex_hull_image
 from utils.rle import enc2mask
-
+from data.transforms import HE_preprocess
 
 def load_image(img_path, full_size=True):
     """
@@ -199,6 +199,7 @@ class InferenceDataset(Dataset):
         self.overlap_factor = overlap_factor
 
         self.positions = self.get_positions()
+
         self.transforms = transforms
 
         if rle is not None:
@@ -260,7 +261,27 @@ class InferenceDataset(Dataset):
 
 class InMemoryTrainDataset(Dataset):
     """
-    Training dataset without precomputing tiles
+    In Memory Dataset, which allows to smart tile sampling of any size and reduction factor.
+
+    Everything must be loaded into RAM once (takes about 4 minutes).
+
+    The self.train method allows to easily switch from training/validation mode.
+    It changes the image used for tiles and disable transformation.
+
+    The self.update_fold_nb allows to change fold without reloading everything
+
+    Params
+    ------
+        - train_img_names : images to use for CV
+        - df_rle : training pandas df with rle encoded masks
+        - train_tile_size : int, size of images to input model
+        - reduce_factor : reduction factor to apply before entering the model
+        - transforms : albu transfo, augmentation scheme
+        - train_path : path to folder with the original tiff images
+        - iter_per_epoch : int, number of tiles that constitue an epoch
+        - on_sport_samping : float between 0 and 1, probability of rejection outside conv hull
+                             (1. means only intersting tiles, 0 purely random tiles)
+        - fold_nb : which fold are we considereing at the moment (everything is in RAM)
     """
     def __init__(
         self,
@@ -279,7 +300,9 @@ class InMemoryTrainDataset(Dataset):
         self.reduce_factor = reduce_factor
         self.tile_size = train_tile_size * reduce_factor
         self.on_spot_sampling = on_spot_sampling
-        self.transforms = transforms
+        self.train_transfo = transforms
+        self.valid_transfo = HE_preprocess(augment=False, visualize=False)
+
         self.train_img_names = train_img_names
         self.fold_nb = fold_nb
         
@@ -288,6 +311,8 @@ class InMemoryTrainDataset(Dataset):
         self.masks = []
         self.conv_hulls = []
 
+        self.save_indices = []
+        # Load in memory all resized images, masks and conv_hulls
         for img_name in self.train_img_names:
             img = simple_load(os.path.join(train_path, img_name+".tiff"))
             orig_img_size = img.shape
@@ -322,15 +347,25 @@ class InMemoryTrainDataset(Dataset):
         #Switch to train mode
         if is_train:
             self.used_tiles = self.train_tiles
+            self.transforms = self.train_transfo
+            self.sampling_thresh = self.on_spot_sampling
         else:
+            # switch tile, disable transformation and on_spot_sampling (should we?)
             self.used_tiles = self.valid_tiles
+            self.transforms = self.valid_transfo
+            self.sampling_thresh = 0
 
     def update_fold_nb(self, fold_nb):
+        """
+        Allows switching fold without reloading everything
+        """
         # 5 fold cv hard coded
         self.train_tiles = [tile_nb for tile_nb in range(len(self.train_img_names))
                             if tile_nb % 5 != fold_nb]
         self.valid_tiles = [tile_nb for tile_nb in range(len(self.train_img_names))
                             if tile_nb % 5 == fold_nb]
+        self.train_set = [self.train_img_names[idx] for idx in self.train_tiles]
+        self.valid_set = [self.train_img_names[idx] for idx in self.valid_tiles]
         return
     
     def __len__(self):
@@ -344,7 +379,7 @@ class InMemoryTrainDataset(Dataset):
         is_point_ok = False
         
         while not is_point_ok:
-            # Window
+            # Sample random point
             x1 = np.random.randint(img_dim[0]-self.train_tile_size)
             x2 = x1 + self.train_tile_size
 
@@ -352,13 +387,15 @@ class InMemoryTrainDataset(Dataset):
             y2 = y1 + self.train_tile_size
             
             if self.conv_hulls[image_nb][int((x1+x2)/2),int((y1+y2)/2)]:
-                # this is inside the convhull
+                # this is inside the convhull so keep it
                 is_point_ok = True
             else:
+                # Allow only a fraction of images to be outisde
                 should_keep = np.random.rand()
-                if should_keep > self.on_spot_sampling:
+                if should_keep > self.sampling_thresh:
                     is_point_ok = True
 
+        self.save_indices.append(x1)
         img = self.imgs[image_nb][x1:x2,y1:y2]
         mask = self.masks[image_nb][x1:x2,y1:y2]
         
