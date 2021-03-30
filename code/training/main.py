@@ -80,7 +80,7 @@ def train(config, dataset, fold, log_folder=None):
     return meter, history, model
 
 
-def validate(model, config, val_images):
+def validate(model, config, val_images, reduce_factor):
     """
     # WARNING : THIS WILL NOT WORK WITH REDUCE_FACTOR != 4
     Quick model validation on full images.
@@ -91,12 +91,12 @@ def validate(model, config, val_images):
         config ([type]): Model config.
         val_images (list]): Validation image ids.
     """
-    rles = pd.read_csv(DATA_PATH + "train_4.csv")
+    rles = pd.read_csv(DATA_PATH + f"train_{reduce_factor}.csv")
     scores = []
     for img in val_images:
 
         predict_dataset = InferenceDataset(
-            f"{TIFF_PATH_4}/{img}.tiff",
+            f"{DATA_PATH}train_{reduce_factor}/{img}.tiff",
             rle=rles[rles["id"] == img]["encoding"],
             overlap_factor=config.overlap_factor,
             reduce_factor=1,
@@ -133,41 +133,39 @@ def k_fold(config, df, log_folder=None):
     scores = []
     print("Creating in memory dataset (once)...")
     start_time = time.time()
-    df_rle = pd.read_csv('../input/train.csv')
+    df_rle = pd.read_csv(f'../input/train_{config.reduce_factor}.csv')
     train_img_names = df_rle.id.unique()
     in_mem_dataset = InMemoryTrainDataset(train_img_names,
                                           df_rle,
                                           train_tile_size=config.train_tile_size,
                                           reduce_factor=config.reduce_factor,
-                                          transforms=HE_preprocess(),
-                                          train_path="../input/train/",
+                                          train_transfo=HE_preprocess(size=config.train_tile_size),
+                                          valid_transfo=HE_preprocess(augment=False, size=config.train_tile_size),
+                                          train_path=f"../input/train_{config.reduce_factor}/",
                                           iter_per_epoch=config.iter_per_epoch,
                                           on_spot_sampling=config.on_spot_sampling)
     print(f"Took {time.time() - start_time:3f} seconds.")
 
-    for i, fold in enumerate(folds):
-        if i in config.selected_folds:
-            print(f"\n-------------   Fold {i + 1} / {len(folds)}  -------------\n")
+    for i in config.selected_folds:
+        print(f"\n-------------   Fold {i + 1} / {len(folds)}  -------------\n")
 
-            df_val = df[df[config.cv_column] == fold].reset_index()
+        meter, history, model = train(
+            config, in_mem_dataset, i, log_folder=log_folder
+        )
 
-            meter, history, model = train(
-                config, in_mem_dataset, i, log_folder=log_folder
-            )
+        print("\n    -> Validating \n")
 
-            print("\n    -> Validating \n")
+        val_images = in_mem_dataset.valid_set
+        scores += validate(model, config, val_images, config.reduce_factor)
 
-            val_images = in_mem_dataset.valid_set
-            scores += validate(model, config, val_images)
+        if log_folder is not None:
+            history.to_csv(log_folder + f"history_{i}.csv", index=False)
 
-            if log_folder is not None:
-                history.to_csv(log_folder + f"history_{i}.csv", index=False)
+        if log_folder is None or len(config.selected_folds) == 1:
+            return meter
 
-            if log_folder is None or len(config.selected_folds) == 1:
-                return meter
-
-            del meter, model
-            torch.cuda.empty_cache()
-            gc.collect()
+        del meter, model
+        torch.cuda.empty_cache()
+        gc.collect()
 
     print(f"\n\n  ->  Dice CV : {np.mean(scores) :.3f}  +/- {np.std(scores) :.3f}")

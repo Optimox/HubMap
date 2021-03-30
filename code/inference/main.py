@@ -37,8 +37,8 @@ def validate_inf(
         rle_path = DATA_PATH + "train.csv"
         reduce_factor = REDUCE_FACTOR
     else:
-        root = TIFF_PATH_4
-        rle_path = DATA_PATH + "train_4.csv"
+        root = DATA_PATH + f"train_{config.reduce_factor}/"
+        rle_path = DATA_PATH + f"train_{config.reduce_factor}.csv"
         reduce_factor = 1
 
     rles = pd.read_csv(rle_path)

@@ -187,7 +187,7 @@ class InferenceDataset(Dataset):
         reduce_factor=4,
         transforms=None,
     ):
-        self.original_img = load_image(original_img_path, full_size=reduce_factor > 1)
+        self.original_img = simple_load(original_img_path)
         self.orig_size = self.original_img.shape
 
         # self.original_img = lab_normalization(self.original_img)
@@ -289,7 +289,8 @@ class InMemoryTrainDataset(Dataset):
         df_rle,
         train_tile_size=256,
         reduce_factor=4,
-        transforms=None,
+        train_transfo=None,
+        valid_transfo=None,
         train_path="../input/train/",
         iter_per_epoch=1000,
         on_spot_sampling=0.9,
@@ -297,11 +298,14 @@ class InMemoryTrainDataset(Dataset):
     ):
         self.iter_per_epoch = iter_per_epoch
         self.train_tile_size = train_tile_size
+        ## Allows to make heavier transfo without artefact by center cropping
+        self.before_crop_size = int(1.5*self.train_tile_size)
+
         self.reduce_factor = reduce_factor
         self.tile_size = train_tile_size * reduce_factor
         self.on_spot_sampling = on_spot_sampling
-        self.train_transfo = transforms
-        self.valid_transfo = HE_preprocess(augment=False, visualize=False)
+        self.train_transfo = train_transfo
+        self.valid_transfo = valid_transfo
 
         self.train_img_names = train_img_names
         self.fold_nb = fold_nb
@@ -317,21 +321,21 @@ class InMemoryTrainDataset(Dataset):
             img = simple_load(os.path.join(train_path, img_name+".tiff"))
             orig_img_size = img.shape
             
-            img = cv2.resize(
-                            img,
-                            (orig_img_size[0]//self.reduce_factor, orig_img_size[1]//self.reduce_factor),
-                            interpolation=cv2.INTER_AREA
-                            )
+            # img = cv2.resize(
+            #                 img,
+            #                 (orig_img_size[0]//self.reduce_factor, orig_img_size[1]//self.reduce_factor),
+            #                 interpolation=cv2.INTER_AREA
+            #                 )
             img_size = img.shape
 
             rle = df_rle.loc[df_rle.id==img_name, "encoding"]
             mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
             
-            mask = cv2.resize(
-                            mask,
-                            (orig_img_size[0]//self.reduce_factor, orig_img_size[1]//self.reduce_factor),
-                            interpolation=cv2.INTER_NEAREST
-                            )
+            # mask = cv2.resize(
+            #                 mask,
+            #                 (orig_img_size[0]//self.reduce_factor, orig_img_size[1]//self.reduce_factor),
+            #                 interpolation=cv2.INTER_NEAREST
+            #                 )
             
             conv_hull = convex_hull_image(mask)
             self.imgs.append(img)
@@ -346,12 +350,12 @@ class InMemoryTrainDataset(Dataset):
     def train(self, is_train):
         #Switch to train mode
         if is_train:
-            self.used_tiles = self.train_tiles
+            self.used_img_idx = self.train_img_idx
             self.transforms = self.train_transfo
             self.sampling_thresh = self.on_spot_sampling
         else:
             # switch tile, disable transformation and on_spot_sampling (should we?)
-            self.used_tiles = self.valid_tiles
+            self.used_img_idx = self.valid_img_idx
             self.transforms = self.valid_transfo
             self.sampling_thresh = 0
 
@@ -360,12 +364,12 @@ class InMemoryTrainDataset(Dataset):
         Allows switching fold without reloading everything
         """
         # 5 fold cv hard coded
-        self.train_tiles = [tile_nb for tile_nb in range(len(self.train_img_names))
+        self.train_img_idx = [tile_nb for tile_nb in range(len(self.train_img_names))
                             if tile_nb % 5 != fold_nb]
-        self.valid_tiles = [tile_nb for tile_nb in range(len(self.train_img_names))
+        self.valid_img_idx = [tile_nb for tile_nb in range(len(self.train_img_names))
                             if tile_nb % 5 == fold_nb]
-        self.train_set = [self.train_img_names[idx] for idx in self.train_tiles]
-        self.valid_set = [self.train_img_names[idx] for idx in self.valid_tiles]
+        self.train_set = [self.train_img_names[idx] for idx in self.train_img_idx]
+        self.valid_set = [self.train_img_names[idx] for idx in self.valid_img_idx]
         return
     
     def __len__(self):
@@ -373,18 +377,18 @@ class InMemoryTrainDataset(Dataset):
 
     def __getitem__(self, idx):
         
-        image_nb = self.used_tiles[idx % len(self.used_tiles)]
+        image_nb = self.used_img_idx[idx % len(self.used_img_idx)]
         img_dim = self.image_sizes[image_nb]
         
         is_point_ok = False
         
         while not is_point_ok:
             # Sample random point
-            x1 = np.random.randint(img_dim[0]-self.train_tile_size)
-            x2 = x1 + self.train_tile_size
+            x1 = np.random.randint(img_dim[0]-self.before_crop_size)
+            x2 = x1 + self.before_crop_size
 
-            y1 = np.random.randint(img_dim[1]-self.train_tile_size)
-            y2 = y1 + self.train_tile_size
+            y1 = np.random.randint(img_dim[1]-self.before_crop_size)
+            y2 = y1 + self.before_crop_size
             
             if self.conv_hulls[image_nb][int((x1+x2)/2),int((y1+y2)/2)]:
                 # this is inside the convhull so keep it
