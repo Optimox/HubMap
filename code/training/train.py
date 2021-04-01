@@ -68,7 +68,6 @@ def fit(
         pin_memory=True
     )
 
-
     meter = SegmentationMeter()
 
     num_warmup_steps = int(warmup_prop * epochs * len(data_loader))
