@@ -3,9 +3,6 @@ import numpy as np
 
 NUM_WORKERS = 2
 
-TILE_SIZE = 256
-REDUCE_FACTOR = 4
-
 DATA_PATH = "../input/"
 TIFF_PATH = DATA_PATH + "train/"
 TIFF_PATH_4 = DATA_PATH + "train_4/"
@@ -13,11 +10,7 @@ TIFF_PATH_4 = DATA_PATH + "train_4/"
 LOG_PATH = "../logs/"
 OUT_PATH = "../output/"
 
-IMG_PATH = DATA_PATH + f"train_{TILE_SIZE}_red_{REDUCE_FACTOR}"
-MASK_PATH = DATA_PATH + f"masks_{TILE_SIZE}_red_{REDUCE_FACTOR}"
-
 CLASSES = ["ftus"]
-
 NUM_CLASSES = len(CLASSES)
 
 MEAN = np.array([0.66437738, 0.50478148, 0.70114894])
