@@ -36,7 +36,7 @@ def lab_normalization(img, mean=None, std=None):
     return (img_n * 255).astype(np.uint8)
 
 
-def blur_transforms(p=0.5, blur_limit=5):
+def blur_transforms(p=0.5, blur_limit=5, gaussian_limit=(5, 7)): # blur_limit=11, gaussian_limit=(11, 11)
     """
     Applies MotionBlur or GaussianBlur random with a probability p.
 
@@ -50,7 +50,7 @@ def blur_transforms(p=0.5, blur_limit=5):
     return albu.OneOf(
         [
             albu.MotionBlur(blur_limit=blur_limit, always_apply=True),
-            albu.GaussianBlur(blur_limit=blur_limit, always_apply=True),
+            albu.GaussianBlur(blur_limit=gaussian_limit, always_apply=True),
         ],
         p=p,
     )
@@ -144,8 +144,17 @@ def distortion_transforms(p=0.5):
         p=p,
     )
 
+def center_crop(size):
+    if size is None:
+        #disable cropping
+        p=0
+    else:
+        # always crop
+        p=1
+    return albu.CenterCrop(size, size, p=p)
 
-def HE_preprocess(augment=True, visualize=False, mean=MEAN, std=STD):
+
+def HE_preprocess(augment=True, visualize=False, mean=MEAN, std=STD, size=None):
     """
     Returns transformations for the H&E images.
 
@@ -160,11 +169,15 @@ def HE_preprocess(augment=True, visualize=False, mean=MEAN, std=STD):
     """
     if visualize:
         normalizer = albu.Compose(
-            [albu.Normalize(mean=[0, 0, 0], std=[1, 1, 1]), ToTensorV2()], p=1
+            [center_crop(size),
+             albu.Normalize(mean=[0, 0, 0], std=[1, 1, 1]), ToTensorV2()],
+            p=1
         )
     else:
         normalizer = albu.Compose(
-            [albu.Normalize(mean=mean, std=std), ToTensorV2()], p=1
+            [center_crop(size), 
+             albu.Normalize(mean=mean, std=std), ToTensorV2()],
+            p=1
         )
 
     if augment:
@@ -174,8 +187,10 @@ def HE_preprocess(augment=True, visualize=False, mean=MEAN, std=STD):
                 albu.HorizontalFlip(p=0.5),
                 albu.ShiftScaleRotate(
                     scale_limit=0.1, shift_limit=0.1, rotate_limit=90, p=0.5
+                    # scale_limit=0.05, shift_limit=0.
                 ),
                 color_transforms(p=0.5),
+                blur_transforms(p=0.5),
                 # distortion_transforms(p=0.5),
                 normalizer,
             ]

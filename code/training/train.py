@@ -13,8 +13,7 @@ from training.optim import define_loss, define_optimizer, prepare_for_loss
 
 def fit(
     model,
-    train_dataset,
-    val_dataset,
+    dataset,
     optimizer_name="Adam",
     loss_name="BCEWithLogitsLoss",
     activation="sigmoid",
@@ -34,7 +33,6 @@ def fit(
     Args:
         model (torch model): Model to train.
         train_dataset (torch dataset): Dataset to train with.
-        val_dataset (torch dataset): Dataset to validate with.
         optimizer_name (str, optional): Optimizer name. Defaults to 'adam'.
         loss_name (str, optional): Loss name. Defaults to 'BCEWithLogitsLoss'.
         activation (str, optional): Activation function. Defaults to 'sigmoid'.
@@ -62,34 +60,26 @@ def fit(
 
     loss_fct = define_loss(loss_name, device=device)
 
-    train_loader = DataLoader(
-        train_dataset,
+    data_loader = DataLoader(
+        dataset,
         batch_size=batch_size,
-        shuffle=True,
-        drop_last=True,
+        drop_last=False,
         num_workers=NUM_WORKERS,
         pin_memory=True
     )
 
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=val_bs,
-        shuffle=False,
-        num_workers=NUM_WORKERS,
-        pin_memory=True,
-    )
 
     meter = SegmentationMeter()
 
-    num_warmup_steps = int(warmup_prop * epochs * len(train_loader))
-    num_training_steps = int(epochs * len(train_loader))
+    num_warmup_steps = int(warmup_prop * epochs * len(data_loader))
+    num_training_steps = int(epochs * len(data_loader))
     scheduler = get_linear_schedule_with_warmup(
         optimizer, num_warmup_steps, num_training_steps
     )
 
     for epoch in range(epochs):
         model.train()
-
+        dataset.train(True)
         start_time = time.time()
         optimizer.zero_grad()
 
@@ -98,7 +88,7 @@ def fit(
         if epoch + 1 > swa_first_epoch:
             optimizer.swap_swa_sgd()
 
-        for batch in train_loader:
+        for batch in data_loader:
             x = batch[0].to(device).float()
             y_batch = batch[1].float()
 
@@ -109,7 +99,7 @@ def fit(
 
             loss.backward()
 
-            avg_loss += loss.item() / len(train_loader)
+            avg_loss += loss.item() / len(data_loader)
 
             optimizer.step()
             scheduler.step()
@@ -122,12 +112,13 @@ def fit(
             optimizer.swap_swa_sgd()
 
         model.eval()
+        dataset.train(False)
         avg_val_loss = 0.
         meter.reset()
 
         if epoch + 1 >= first_epoch_eval:
             with torch.no_grad():
-                for batch in val_loader:
+                for batch in data_loader:
                     x = batch[0].to(device).float()
                     y_batch = batch[1].float()
 
@@ -142,7 +133,7 @@ def fit(
                     )
 
                     loss = loss_fct(y_pred, y_batch).mean()
-                    avg_val_loss += loss / len(val_loader)
+                    avg_val_loss += loss / len(data_loader)
 
                     if activation == "sigmoid":
                         y_pred = torch.sigmoid(y_pred)
@@ -170,7 +161,7 @@ def fit(
                 history, metrics, epoch + 1, avg_loss, avg_val_loss, elapsed_time
             )
 
-    del val_loader, train_loader, y_pred, loss, x, y_batch
+    del data_loader, y_pred, loss, x, y_batch
     torch.cuda.empty_cache()
 
     return meter, history
