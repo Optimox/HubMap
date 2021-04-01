@@ -35,9 +35,11 @@ def train(config, dataset, fold, log_folder=None):
     model = define_model(
         config.decoder,
         config.encoder,
+        config.model,
         num_classes=config.num_classes,
         encoder_weights=config.encoder_weights,
-        double_model=config.double_model
+        double_model=config.double_model,
+        input_size=config.tile_size,
     ).to(config.device)
     model.zero_grad()
 

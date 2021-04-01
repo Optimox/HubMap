@@ -79,3 +79,13 @@ def count_parameters(model, all=False):
         return sum(p.numel() for p in model.parameters())
     else:
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def get_n_params(model):
+    pp = 0
+    for p in list(model.parameters()):
+        nn = 1
+        for s in list(p.size()):
+            nn = nn * s
+        pp += nn
+    return pp
