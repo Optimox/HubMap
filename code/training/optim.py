@@ -62,7 +62,7 @@ def define_loss(name, device="cuda"):
     elif name == "lovasz":
         loss = lovasz_loss
     elif name == "SoftDiceLoss":
-        loss = SoftDiceLoss(reduction="none")
+        loss = SoftDiceLoss()
     else:
         raise NotImplementedError
 
@@ -89,7 +89,7 @@ def prepare_for_loss(y_pred, y_batch, loss, device="cuda", train=True):
 
     if loss in ["BCEWithLogitsLoss", "lovasz", "HaussdorfLoss", "SoftDiceLoss"]:
         y_batch = y_batch.to(device)
-        y_pred = y_pred.squeeze()
+        y_pred = y_pred.squeeze(1)
         if not train:
             y_pred = y_pred.detach()
     else:

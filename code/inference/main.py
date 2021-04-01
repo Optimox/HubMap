@@ -17,7 +17,7 @@ from utils.rle import enc2mask
 from utils.torch import load_model_weights
 from utils.metrics import dice_scores_img, tweak_threshold
 
-from params import TIFF_PATH, DATA_PATH, REDUCE_FACTOR, TIFF_PATH_4
+from params import TIFF_PATH, DATA_PATH, REDUCE_FACTOR, TIFF_PATH_4, TILE_SIZE
 
 
 def validate_inf(
@@ -54,6 +54,7 @@ def validate_inf(
             rle=rles[rles["id"] == img]["encoding"],
             overlap_factor=config.overlap_factor,
             reduce_factor=reduce_factor,
+            tile_size=TILE_SIZE,
             transforms=HE_preprocess(augment=False, visualize=False),
         )
 

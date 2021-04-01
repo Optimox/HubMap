@@ -10,7 +10,7 @@ from model_zoo.models import define_model
 from utils.save import save_as_jit
 from utils.torch import seed_everything, count_parameters, save_model_weights
 
-from params import SIZE, TIFF_PATH_4, DATA_PATH
+from params import TIFF_PATH_4, DATA_PATH
 from training.predict import predict_entire_mask_downscaled
 from utils.metrics import tweak_threshold
 import time
@@ -73,9 +73,6 @@ def train(config, dataset, fold, log_folder=None):
             name,
             cp_folder=log_folder,
         )
-        # disable jit saving
-        # if "efficientnet" not in name:
-        #     save_as_jit(model, log_folder, name, train_img_size=SIZE)
 
     return meter, history, model
 
@@ -155,8 +152,8 @@ def k_fold(config, df, log_folder=None):
 
         print("\n    -> Validating \n")
 
-        val_images = in_mem_dataset.valid_set
-        scores += validate(model, config, val_images, config.reduce_factor)
+        val_images = df_val["tile_name"].apply(lambda x: x.split("_")[0]).unique()
+        scores += validate(model, config, val_images)
 
         if log_folder is not None:
             history.to_csv(log_folder + f"history_{i}.csv", index=False)
