@@ -226,7 +226,6 @@ class InMemoryTrainDataset(Dataset):
         self.masks = []
         self.conv_hulls = []
 
-        self.save_indices = []
         # Load in memory all resized images, masks and conv_hulls
         for img_name in self.train_img_names:
             img = simple_load(os.path.join(train_path, img_name + ".tiff"))
@@ -321,7 +320,6 @@ class InMemoryTrainDataset(Dataset):
                 if should_keep > self.sampling_thresh:
                     is_point_ok = True
 
-        self.save_indices.append(x1)
         img = self.imgs[image_nb][x1:x2, y1:y2]
         mask = self.masks[image_nb][x1:x2, y1:y2]
 
