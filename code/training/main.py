@@ -115,19 +115,17 @@ def validate(model, config, val_images):
     return scores
 
 
-def k_fold(config, df, log_folder=None):
+def k_fold(config, log_folder=None):
     """
     Performs a patient grouped k-fold cross validation.
     The following things are saved to the log folder : val predictions, histories
 
     Args:
         config (Config): Parameters.
-        df (pandas dataframe): Metadata.
         log_folder (None or str, optional): Folder to logs results to. Defaults to None.
     """
-    folds = df[config.cv_column].unique()
     scores = []
-
+    nb_folds = 5
     # Data preparation
     print("Creating in-memory dataset ...")
 
@@ -149,7 +147,7 @@ def k_fold(config, df, log_folder=None):
     print(f"Done in {time.time() - start_time :.0f} seconds.")
 
     for i in config.selected_folds:
-        print(f"\n-------------   Fold {i + 1} / {len(folds)}  -------------\n")
+        print(f"\n-------------   Fold {i + 1} / {nb_folds}  -------------\n")
 
         meter, history, model = train(config, in_mem_dataset, i, log_folder=log_folder)
 
