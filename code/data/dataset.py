@@ -206,7 +206,17 @@ class InMemoryTrainDataset(Dataset):
         iter_per_epoch=1000,
         on_spot_sampling=0.9,
         fold_nb=0,
+        sampling_mode='convhull'
     ):
+        """
+        possible mode:
+            - centered : center of image should contain glomuleri
+            - convhull : will use conv_hull only
+            - random : any
+            - visible : tile should have at least 2K pixels as glomuleri
+        """
+        self.sampling_mode = sampling_mode
+        assert(self.sampling_mode in ['centered', 'convhull', 'random', 'visible'])
         self.iter_per_epoch = iter_per_epoch
         self.train_tile_size = train_tile_size
         # Allows to make heavier transfo without artefact by center cropping
@@ -224,6 +234,7 @@ class InMemoryTrainDataset(Dataset):
         self.imgs = []
         self.image_sizes = []
         self.masks = []
+        
         self.conv_hulls = []
 
         # Load in memory all resized images, masks and conv_hulls
@@ -231,33 +242,21 @@ class InMemoryTrainDataset(Dataset):
             img = simple_load(os.path.join(train_path, img_name + ".tiff"))
             orig_img_size = img.shape
 
-            # img = cv2.resize(
-            #     img,
-            #     (
-            #         orig_img_size[0] // self.reduce_factor,
-            #         orig_img_size[1] // self.reduce_factor,
-            #     ),
-            #     interpolation=cv2.INTER_AREA,
-            # )
+            
             img_size = img.shape
 
             rle = df_rle.loc[df_rle.id == img_name, "encoding"]
             mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
-
-            # mask = cv2.resize(
-            #     mask,
-            #     (
-            #         orig_img_size[0] // self.reduce_factor,
-            #         orig_img_size[1] // self.reduce_factor,
-            #     ),
-            #     interpolation=cv2.INTER_NEAREST,
-            # )
-
-            conv_hull = convex_hull_image(mask)
+            
+            if self.sampling_mode=='convhull':
+                conv_hull = convex_hull_image(mask)
+                self.conv_hulls.append(conv_hull)
             self.imgs.append(img)
             self.image_sizes.append(img_size)
             self.masks.append(mask)
-            self.conv_hulls.append(conv_hull)
+            
+
+        self.images_areas = [h*w for (h,w,c) in self.image_sizes]
 
         # Deal with fold inside this to avoid reloading for each fold (time consuming)
         self.update_fold_nb(self.fold_nb)
@@ -269,6 +268,10 @@ class InMemoryTrainDataset(Dataset):
             self.used_img_idx = self.train_img_idx
             self.transforms = self.train_transfo
             self.sampling_thresh = self.on_spot_sampling
+            self.sampling_probs = np.array([area for idx, area
+                                            in enumerate(self.images_areas)
+                                            if idx in self.used_img_idx])
+            self.sampling_probs = self.sampling_probs / np.sum(self.sampling_probs)
         else:
             # switch tile, disable transformation and on_spot_sampling (should we?)
             self.used_img_idx = self.valid_img_idx
@@ -296,11 +299,40 @@ class InMemoryTrainDataset(Dataset):
     def __len__(self):
         return self.iter_per_epoch
 
+    def accept_tile_policy(self, image_nb, x1, x2, y1, y2):
+        if self.sampling_thresh==0:
+            return True
+        
+        if self.sampling_mode == 'centered':
+            if self.masks[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
+                return True
+        elif self.sampling_mode == 'convhull':
+            if self.conv_hulls[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
+                return True
+        elif self.sampling_mode == "visible":
+            if self.masks[image_nb][x1:x2, y1:y2].sum() > 2000:
+                return True
+        elif self.sampling_mode == 'random':
+            return True
+        else:
+            should_keep = np.random.rand()
+            if should_keep > self.sampling_thresh:
+                return True
+            else:
+                return False
+
     def __getitem__(self, idx):
 
-        image_nb = self.used_img_idx[idx % len(self.used_img_idx)]
-        img_dim = self.image_sizes[image_nb]
+        if self.sampling_thresh == 0:
+            # take uniformly from images for validation
+            image_nb = self.used_img_idx[idx % len(self.used_img_idx)]
+        else:
+            image_nb = self.used_img_idx[np.random.choice(range(len(self.used_img_idx)),
+                                                          replace=True,
+                                                          p=self.sampling_probs)
+                                                          ]
 
+        img_dim = self.image_sizes[image_nb]
         is_point_ok = False
 
         while not is_point_ok:
@@ -311,19 +343,12 @@ class InMemoryTrainDataset(Dataset):
             y1 = np.random.randint(img_dim[1] - self.before_crop_size)
             y2 = y1 + self.before_crop_size
 
-            if self.conv_hulls[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
-                # this is inside the convhull so keep it
-                is_point_ok = True
-            else:
-                # Allow only a fraction of images to be outisde
-                should_keep = np.random.rand()
-                if should_keep > self.sampling_thresh:
-                    is_point_ok = True
+            is_point_ok = self.accept_tile_policy(image_nb, x1, x2, y1, y2)
 
         img = self.imgs[image_nb][x1:x2, y1:y2]
         mask = self.masks[image_nb][x1:x2, y1:y2]
 
-        if self.transforms:
+        if self.transforms:                
             augmented = self.transforms(image=img, mask=mask)
             img = augmented["image"]
             mask = augmented["mask"]

@@ -92,8 +92,8 @@ def color_transforms(p=0.5):
                 [
                     albu.RandomGamma(gamma_limit=(80, 120), p=1),
                     albu.RandomBrightnessContrast(
-                        brightness_limit=0.1,
-                        contrast_limit=0.1,
+                        brightness_limit=0.1, #0.3
+                        contrast_limit=0.1, #0.3
                         p=1,
                     ),
                 ]
@@ -111,8 +111,8 @@ def color_transforms(p=0.5):
                 p=1,
             ),
             albu.ColorJitter(
-                brightness=0.1,
-                contrast=0.1,
+                brightness=0.1, # 0.3
+                contrast=0.1, # 0.3
                 saturation=0.1,
                 hue=0.05,
                 p=1,

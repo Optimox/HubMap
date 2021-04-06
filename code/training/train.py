@@ -54,6 +54,9 @@ def fit(
     avg_val_loss = 0.0
     history = None
 
+    # scaler for mixed precision
+    scaler = torch.cuda.amp.GradScaler()
+
     optimizer = define_optimizer(optimizer_name, model.parameters(), lr=lr)
     if swa_first_epoch <= epochs:
         optimizer = SWA(optimizer)
@@ -91,16 +94,20 @@ def fit(
             x = batch[0].to(device).float()
             y_batch = batch[1].float()
 
-            y_pred = model(x)
+            with torch.cuda.amp.autocast():
+                y_pred = model(x)
 
-            y_pred, y_batch = prepare_for_loss(y_pred, y_batch, loss_name, device=device)
-            loss = loss_fct(y_pred, y_batch).mean()
+                y_pred, y_batch = prepare_for_loss(y_pred, y_batch, loss_name, device=device)
 
-            loss.backward()
+            
+                loss = loss_fct(y_pred, y_batch).mean()
 
-            avg_loss += loss.item() / len(data_loader)
+                scaler.scale(loss).backward()
 
-            optimizer.step()
+                avg_loss += loss.item() / len(data_loader)
+
+                scaler.step(optimizer)
+                scaler.update()
             scheduler.step()
 
             for param in model.parameters():

@@ -6,7 +6,7 @@ import pandas as pd
 from training.train import fit
 from data.dataset import InMemoryTrainDataset, InferenceDataset
 from data.transforms import HE_preprocess
-from model_zoo.models import define_model
+from model_zoo.models import define_model, define_double_model
 from utils.torch import seed_everything, count_parameters, save_model_weights
 
 from params import DATA_PATH
@@ -37,6 +37,7 @@ def train(config, dataset, fold, log_folder=None):
         config.encoder,
         num_classes=config.num_classes,
         encoder_weights=config.encoder_weights,
+        double_model=config.double_model
     ).to(config.device)
     model.zero_grad()
 
@@ -115,19 +116,17 @@ def validate(model, config, val_images):
     return scores
 
 
-def k_fold(config, df, log_folder=None):
+def k_fold(config, log_folder=None):
     """
     Performs a patient grouped k-fold cross validation.
     The following things are saved to the log folder : val predictions, histories
 
     Args:
         config (Config): Parameters.
-        df (pandas dataframe): Metadata.
         log_folder (None or str, optional): Folder to logs results to. Defaults to None.
     """
-    folds = df[config.cv_column].unique()
     scores = []
-
+    nb_folds = 5
     # Data preparation
     print("Creating in-memory dataset ...")
 
@@ -145,11 +144,12 @@ def k_fold(config, df, log_folder=None):
         train_path=f"../input/train_{config.reduce_factor}/",
         iter_per_epoch=config.iter_per_epoch,
         on_spot_sampling=config.on_spot_sampling,
+        sampling_mode=config.sampling_mode
     )
     print(f"Done in {time.time() - start_time :.0f} seconds.")
 
     for i in config.selected_folds:
-        print(f"\n-------------   Fold {i + 1} / {len(folds)}  -------------\n")
+        print(f"\n-------------   Fold {i + 1} / {nb_folds}  -------------\n")
 
         meter, history, model = train(config, in_mem_dataset, i, log_folder=log_folder)
 
