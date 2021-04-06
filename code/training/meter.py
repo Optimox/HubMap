@@ -1,5 +1,4 @@
-import numpy as np
-from utils.metrics import dice_score
+from utils.metrics import dice_score_tensor
 
 
 class SegmentationMeter:
@@ -18,7 +17,7 @@ class SegmentationMeter:
 
     def update(self, y_batch, preds):
         """
-        Update ground truths and predictions
+        Updates the metric.
 
         Args:
             y_batch (tensor): Truths.
@@ -27,15 +26,8 @@ class SegmentationMeter:
         Raises:
             NotImplementedError: Mode not implemented.
         """
-        self.y_mask.append(y_batch.cpu().numpy())
-        self.pred_mask.append(preds.cpu().numpy())
-
-    def concat(self):
-        """
-        Concatenates everything.
-        """
-        self.pred_mask = np.concatenate(self.pred_mask)
-        self.y_mask = np.concatenate(self.y_mask)
+        self.dice += dice_score_tensor(preds, y_batch, threshold=self.threshold) * preds.size(0)
+        self.count += preds.size(0)
 
     def compute(self):
         """
@@ -44,16 +36,15 @@ class SegmentationMeter:
         Returns:
             dict: Metrics dictionary.
         """
-        self.concat()
-        self.metrics["dice"] = [dice_score(self.pred_mask, self.y_mask)]
+        self.metrics["dice"] = [self.dice / self.count]
         return self.metrics
 
     def reset(self):
         """
         Resets everything.
         """
-        self.pred_mask = []
-        self.y_mask = []
+        self.dice = 0
+        self.count = 0
         self.metrics = {
             "dice": [0],
         }

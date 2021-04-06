@@ -64,6 +64,27 @@ def dice_score(pred, truth, eps=1e-8, threshold=0.5):
     return dice.mean()
 
 
+def dice_score_tensor(pred, truth, eps=1e-8, threshold=0.5):
+    """
+    Dice metric for tensors. Only classes that are present are weighted.
+
+    Args:
+        pred (torch tensor): Predictions.
+        truth (torch tensor): Ground truths.
+        eps (float, optional): epsilon to avoid dividing by 0. Defaults to 1e-8.
+        threshold (float, optional): Threshold for predictions. Defaults to 0.5.
+
+    Returns:
+        float: dice value
+    """
+    pred = (pred.view((truth.size(0), -1)) > threshold).int()
+    truth = truth.view((truth.size(0), -1)).int()
+    intersect = (pred + truth == 2).sum(-1)
+    union = pred.sum(-1) + truth.sum(-1)
+    dice = (2.0 * intersect + eps) / (union + eps)
+    return dice.mean()
+
+
 def tweak_threshold(mask, pred):
     thresholds = []
     scores = []

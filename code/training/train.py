@@ -99,7 +99,6 @@ def fit(
 
                 y_pred, y_batch = prepare_for_loss(y_pred, y_batch, loss_name, device=device)
 
-            
                 loss = loss_fct(y_pred, y_batch).mean()
 
                 scaler.scale(loss).backward()
