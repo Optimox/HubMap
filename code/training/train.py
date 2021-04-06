@@ -97,7 +97,6 @@ def fit(
             loss = loss_fct(y_pred, y_batch).mean()
 
             loss.backward()
-
             avg_loss += loss.item() / len(data_loader)
 
             optimizer.step()

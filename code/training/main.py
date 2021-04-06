@@ -39,6 +39,8 @@ def train(config, dataset, fold, log_folder=None):
         num_classes=config.num_classes,
         encoder_weights=config.encoder_weights,
         input_size=config.tile_size,
+        use_bot=config.use_bot,
+        use_fpn=config.use_fpn,
     ).to(config.device)
     model.zero_grad()
 
