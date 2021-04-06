@@ -1,18 +1,18 @@
 import gc
+import time
 import torch
 import numpy as np
 import pandas as pd
 
-from training.train import fit
-from data.dataset import InMemoryTrainDataset, InferenceDataset
-from data.transforms import HE_preprocess
-from model_zoo.models import define_model, define_double_model
-from utils.torch import seed_everything, count_parameters, save_model_weights
 
 from params import DATA_PATH
-from training.predict import predict_entire_mask_downscaled
+from training.train import fit
+from model_zoo.models import define_model
+from data.transforms import HE_preprocess
 from utils.metrics import tweak_threshold
-import time
+from training.predict import predict_entire_mask_downscaled
+from data.dataset import InMemoryTrainDataset, InferenceDataset
+from utils.torch import seed_everything, count_parameters, save_model_weights
 
 
 def train(config, dataset, fold, log_folder=None):
@@ -35,7 +35,6 @@ def train(config, dataset, fold, log_folder=None):
     model = define_model(
         config.decoder,
         config.encoder,
-        config.model,
         num_classes=config.num_classes,
         encoder_weights=config.encoder_weights,
         double_model=config.double_model,

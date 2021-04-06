@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 
 from model_zoo.modules import FPN
@@ -95,3 +96,16 @@ class BotUnetDecoder(nn.Module):
             x = self.final_block(x)
 
         return x
+
+
+class DoubleUNet(torch.nn.Module):
+    def __init__(self, model_1, model_2):
+        super(DoubleUNet, self).__init__()
+        self.model_1 = model_1
+        self.model_2 = model_2
+
+    def forward(self, x):
+        out_1 = torch.sigmoid(self.model_1(x))
+        x_2 = torch.cat([out_1, x], dim=1)
+        out_2 = self.model_2(x_2)
+        return out_2
