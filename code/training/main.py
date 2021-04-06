@@ -40,6 +40,8 @@ def train(config, dataset, fold, log_folder=None):
         encoder_weights=config.encoder_weights,
         double_model=config.double_model,
         input_size=config.tile_size,
+        use_bot=config.use_bot,
+        use_fpn=config.use_fpn,
     ).to(config.device)
     model.zero_grad()
 

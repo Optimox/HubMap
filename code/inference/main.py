@@ -136,8 +136,11 @@ def k_fold_inf(
             model = define_model(
                 config.decoder,
                 config.encoder,
+                config.model,
                 num_classes=config.num_classes,
                 encoder_weights=config.encoder_weights,
+                use_bot=config.use_bot,
+                use_fpn=config.use_fpn,
             ).to(config.device)
             model.zero_grad()
             model.eval()
