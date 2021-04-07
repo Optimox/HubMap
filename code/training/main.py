@@ -99,6 +99,7 @@ def validate(model, config, val_images):
             f"{DATA_PATH}train_{config.reduce_factor}/{img}.tiff",
             rle=rles[rles["id"] == img]["encoding"],
             overlap_factor=config.overlap_factor,
+            tile_size=config.tile_size,
             reduce_factor=1,
             transforms=HE_preprocess(augment=False, visualize=False),
         )
