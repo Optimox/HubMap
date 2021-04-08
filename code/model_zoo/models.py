@@ -53,7 +53,7 @@ def define_model(
     )
 
     if use_bot or use_fpn:
-        pos_size = int(8 * (input_size // 256))
+        pos_size = int(8 * (input_size / 256))
 
         model.decoder = BotUnetDecoder(
             encoder_channels=model.encoder.out_channels,

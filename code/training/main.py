@@ -67,6 +67,7 @@ def train(config, dataset, fold, log_folder=None):
         verbose=config.verbose,
         first_epoch_eval=config.first_epoch_eval,
         device=config.device,
+        use_fp16=config.use_fp16,
     )
 
     if config.save_weights and log_folder is not None:
@@ -99,6 +100,7 @@ def validate(model, config, val_images):
             f"{DATA_PATH}train_{config.reduce_factor}/{img}.tiff",
             rle=rles[rles["id"] == img]["encoding"],
             overlap_factor=config.overlap_factor,
+            tile_size=config.tile_size,
             reduce_factor=1,
             transforms=HE_preprocess(augment=False, visualize=False),
         )
@@ -140,10 +142,10 @@ def k_fold(config, log_folder=None):
     in_mem_dataset = InMemoryTrainDataset(
         train_img_names,
         df_rle,
-        train_tile_size=config.train_tile_size,
+        train_tile_size=config.tile_size,
         reduce_factor=config.reduce_factor,
-        train_transfo=HE_preprocess(size=config.train_tile_size),
-        valid_transfo=HE_preprocess(augment=False, size=config.train_tile_size),
+        train_transfo=HE_preprocess(size=config.tile_size),
+        valid_transfo=HE_preprocess(augment=False, size=config.tile_size),
         train_path=f"../input/train_{config.reduce_factor}/",
         iter_per_epoch=config.iter_per_epoch,
         on_spot_sampling=config.on_spot_sampling,
