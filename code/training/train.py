@@ -25,7 +25,8 @@ def fit(
     swa_first_epoch=50,
     verbose=1,
     first_epoch_eval=0,
-    device="cuda"
+    device="cuda",
+    use_fp16=False,
 ):
     """
     Usual torch fit function.
@@ -45,6 +46,7 @@ def fit(
         verbose (int, optional): Period (in epochs) to display logs at. Defaults to 1.
         first_epoch_eval (int, optional): Epoch to start evaluating at. Defaults to 0.
         device (str, optional): Device for torch. Defaults to "cuda".
+        use_fp16 (bool, optional): Whether to use mixed precision. Defaults to False.
 
     Returns:
         numpy array [len(val_dataset) x num_classes]: Last prediction on the validation data.
@@ -54,8 +56,8 @@ def fit(
     avg_val_loss = 0.0
     history = None
 
-    # scaler for mixed precision
-    scaler = torch.cuda.amp.GradScaler()
+    if use_fp16:
+        scaler = torch.cuda.amp.GradScaler()
 
     optimizer = define_optimizer(optimizer_name, model.parameters(), lr=lr)
     if swa_first_epoch <= epochs:
@@ -94,21 +96,32 @@ def fit(
             x = batch[0].to(device).float()
             y_batch = batch[1].float()
 
-            with torch.cuda.amp.autocast():
+            if use_fp16:
+                with torch.cuda.amp.autocast():
+                    y_pred = model(x)
+
+                    y_pred, y_batch = prepare_for_loss(y_pred, y_batch, loss_name, device=device)
+
+                    loss = loss_fct(y_pred, y_batch).mean()
+
+                    scaler.scale(loss).backward()
+
+                    avg_loss += loss.item() / len(data_loader)
+
+                    scaler.step(optimizer)
+                    scaler.update()
+            else:
                 y_pred = model(x)
 
                 y_pred, y_batch = prepare_for_loss(y_pred, y_batch, loss_name, device=device)
-
                 loss = loss_fct(y_pred, y_batch).mean()
 
-                scaler.scale(loss).backward()
-
+                loss.backward()
                 avg_loss += loss.item() / len(data_loader)
 
-                scaler.step(optimizer)
-                scaler.update()
-            scheduler.step()
+                optimizer.step()
 
+            scheduler.step()
             for param in model.parameters():
                 param.grad = None
 
