@@ -149,7 +149,8 @@ def k_fold(config, log_folder=None):
         train_path=f"../input/train_{config.reduce_factor}/",
         iter_per_epoch=config.iter_per_epoch,
         on_spot_sampling=config.on_spot_sampling,
-        sampling_mode=config.sampling_mode
+        sampling_mode=config.sampling_mode,
+        use_external=config.use_external,
     )
     print(f"Done in {time.time() - start_time :.0f} seconds.")
 
