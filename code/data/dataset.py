@@ -1,5 +1,6 @@
 import os
 import cv2
+import torch
 import numpy as np
 import pandas as pd
 import tifffile as tiff
@@ -395,3 +396,44 @@ class InMemoryTrainDataset(Dataset):
             mask = augmented["mask"]
 
         return img, mask
+
+
+class TileClsDataset(Dataset):
+    """
+    Dataset to read from tiled images.
+    """
+
+    def __init__(self, images, root="", transforms=None):
+        """
+        Args:
+            df (pandas dataframe): file_names.
+            img_dir (str, optional): Images directory. Defaults to "".
+            mask_dir (str, optional): Masks directory. Defaults to "".
+            transforms (albumentation transforms, optional) : Transforms. Defaults to None.
+        """
+        self.df = images
+        self.tiles = [root + p for p in os.listdir(root) if p.split('_')[0] in images]
+
+        self.transforms = transforms
+
+    def __len__(self):
+        return len(self.tiles)
+
+    def __getitem__(self, idx):
+        tile = np.load(self.tiles[idx])
+
+        img, mask = tile[:, :, :-2], tile[:, :, -2:]
+
+        img = (img * 255).astype(np.uint8)
+
+        target = mask[:, :, -1][mask.shape[0] // 2, mask.shape[1] // 2]
+
+        if self.transforms:
+            augmented = self.transforms(image=img, mask=mask)
+            img = augmented["image"]
+            mask = augmented["mask"]
+
+        img = torch.cat([img, mask[:, :, 0].unsqueeze(0)], 0)
+        mask = mask[:, :, -1]
+
+        return img, mask, target
