@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import albumentations as albu
 from albumentations.pytorch import ToTensorV2
-
+from albumentations.core.transforms_interface import ImageOnlyTransform
 from params import MEAN, STD
 
 
@@ -36,7 +36,52 @@ def lab_normalization(img, mean=None, std=None):
     return (img_n * 255).astype(np.uint8)
 
 
-def blur_transforms(p=0.5, blur_limit=5, gaussian_limit=(5, 7)):
+# from here : https://github.com/hendrycks/robustness/blob/master/ImageNet-C/create_c/make_imagenet_c.py
+# and here : https://github.com/albumentations-team/albumentations/issues/477
+def disk(radius, alias_blur=0.1, dtype=np.float32):
+    if radius <= 8:
+        L = np.arange(-8, 8 + 1)
+        ksize = (3, 3)
+    else:
+        L = np.arange(-radius, radius + 1)
+        ksize = (5, 5)
+    X, Y = np.meshgrid(L, L)
+    aliased_disk = np.array((X ** 2 + Y ** 2) <= radius ** 2, dtype=dtype)
+    aliased_disk /= np.sum(aliased_disk)
+
+    # supersample disk to antialias
+    return cv2.GaussianBlur(aliased_disk, ksize=ksize, sigmaX=alias_blur)
+
+
+class DefocusBlur(ImageOnlyTransform):
+    """Apply Defocus Blur to mimic defocus on slides
+    
+    - severity : int between 1 and 5
+    """
+
+    def __init__(
+        self,
+        severity=1,
+        always_apply=False,
+        p=1.0,
+    ):
+        super(DefocusBlur, self).__init__(always_apply, p)
+        self.severity = severity
+        self.radius, self.blur = [(3, 0.1), (4, 0.5), (6, 0.5), (8, 0.5), (10, 0.5)][self.severity - 1]
+        
+    def apply(self, image, **params):
+        image = np.array(image) / 255.
+        kernel = disk(radius=self.radius, alias_blur=self.blur)
+        channels = []
+        for d in range(3):
+            channels.append(cv2.filter2D(image[:, :, d], -1, kernel))
+        channels = np.array(channels).transpose((1, 2, 0))
+        return np.clip(channels, 0, 1) * 255
+
+    def get_transform_init_args_names(self):
+        return ("severty")
+
+def blur_transforms(p=0.5, blur_limit=5, gaussian_limit=(5, 7), severity=3):
     # More aggressive : blur_limit=11, gaussian_limit=(11, 11)
     """
     Applies MotionBlur or GaussianBlur random with a probability p.
@@ -49,7 +94,8 @@ def blur_transforms(p=0.5, blur_limit=5, gaussian_limit=(5, 7)):
         albumentation transforms: transforms.
     """
     return albu.OneOf(
-        [
+        [   
+            DefocusBlur(severity=severity, always_apply=True),
             albu.MotionBlur(blur_limit=blur_limit, always_apply=True),
             albu.GaussianBlur(blur_limit=gaussian_limit, always_apply=True),
         ],
@@ -127,7 +173,11 @@ def center_crop(size):
         p = 0
     else:  # always crop
         p = 1
-    return albu.CenterCrop(size, size, p=p)
+
+    return albu.Compose(
+        [albu.PadIfNeeded(size, size, p=p, border_mode=cv2.BORDER_CONSTANT),
+         albu.CenterCrop(size, size, p=p)],
+        p=1)
 
 
 def HE_preprocess(augment=True, visualize=False, mean=MEAN, std=STD, size=None):
