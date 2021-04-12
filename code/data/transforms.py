@@ -81,7 +81,7 @@ class DefocusBlur(ImageOnlyTransform):
     def get_transform_init_args_names(self):
         return ("severty")
 
-def blur_transforms(p=0.5, blur_limit=5, gaussian_limit=(5, 7), severity=3):
+def blur_transforms(p=0.5, blur_limit=5, gaussian_limit=(5, 7), severity=1):
     # More aggressive : blur_limit=11, gaussian_limit=(11, 11)
     """
     Applies MotionBlur or GaussianBlur random with a probability p.
@@ -145,21 +145,21 @@ def color_transforms(p=0.5):
                 ]
             ),
             albu.RGBShift(
-                r_shift_limit=10,
+                r_shift_limit=30,
                 g_shift_limit=0,
-                b_shift_limit=10,
+                b_shift_limit=30,
                 p=1,
             ),
             albu.HueSaturationValue(
-                hue_shift_limit=10,
-                sat_shift_limit=10,
+                hue_shift_limit=30,
+                sat_shift_limit=30,
                 val_shift_limit=30,
                 p=1,
             ),
             albu.ColorJitter(
-                brightness=0.1, # 0.3
-                contrast=0.1, # 0.3
-                saturation=0.1,
+                brightness=0.3, # 0.3
+                contrast=0.3, # 0.3
+                saturation=0.3,
                 hue=0.05,
                 p=1,
             ),
@@ -167,7 +167,17 @@ def color_transforms(p=0.5):
         p=p,
     )
 
-
+def deformation_transform(p=0.5):
+    return albu.OneOf(
+        [
+            albu.ElasticTransform(alpha=1, sigma=50, alpha_affine=50,
+                                  border_mode=cv2.BORDER_CONSTANT, value=0,
+                                  always_apply=True),
+            # albu.GridDistortion(always_apply=True),
+            # albu.OpticalDistortion(distort_limit=1, shift_limit=0.2, always_apply=True)
+        ],
+        p=p,
+    )
 def center_crop(size):
     if size is None:  # disable cropping
         p = 0
@@ -218,6 +228,7 @@ def HE_preprocess(augment=True, visualize=False, mean=MEAN, std=STD, size=None):
                     rotate_limit=90,
                     p=0.5
                 ),
+                deformation_transform(p=0.5),
                 color_transforms(p=0.5),
                 blur_transforms(p=0.5),
                 normalizer,

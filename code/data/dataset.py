@@ -249,7 +249,6 @@ class InMemoryTrainDataset(Dataset):
         for img_name in self.train_img_names:
             img = simple_load(os.path.join(train_path, img_name + ".tiff"))
             orig_img_size = img.shape
-
             img_size = img.shape
 
             rle = df_rle.loc[df_rle.id == img_name, "encoding"]
@@ -346,10 +345,10 @@ class InMemoryTrainDataset(Dataset):
         
         h, w, _ = img.shape
         img = cv2.resize(img,
-                         (2*h//self.reduce_factor, 2*w//self.reduce_factor),
+                         (h//self.reduce_factor, w//self.reduce_factor),
                          interpolation=cv2.INTER_AREA)
         mask = cv2.resize(mask,
-                         (2*h//self.reduce_factor, 2*w//self.reduce_factor),
+                         (h//self.reduce_factor, w//self.reduce_factor),
                          interpolation=cv2.INTER_NEAREST)
 
         if self.transforms:
