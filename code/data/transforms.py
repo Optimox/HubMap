@@ -170,11 +170,11 @@ def color_transforms(p=0.5):
 def deformation_transform(p=0.5):
     return albu.OneOf(
         [
-            albu.ElasticTransform(alpha=1, sigma=50, alpha_affine=50,
+            albu.ElasticTransform(alpha=1, sigma=25, alpha_affine=25,
                                   border_mode=cv2.BORDER_CONSTANT, value=0,
                                   always_apply=True),
-            # albu.GridDistortion(always_apply=True),
-            # albu.OpticalDistortion(distort_limit=1, shift_limit=0.2, always_apply=True)
+            albu.GridDistortion(always_apply=True),
+            albu.OpticalDistortion(distort_limit=1, shift_limit=0.2, always_apply=True)
         ],
         p=p,
     )
