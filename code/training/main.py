@@ -102,7 +102,7 @@ def validate(model, config, val_images):
             overlap_factor=config.overlap_factor,
             tile_size=config.tile_size,
             reduce_factor=1,
-            transforms=HE_preprocess(augment=False, visualize=False),
+            transforms=HE_preprocess(augment=False, visualize=False, size=config.tile_size),
         )
 
         global_pred = predict_entire_mask_downscaled(

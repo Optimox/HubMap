@@ -324,12 +324,12 @@ class InMemoryTrainDataset(Dataset):
                 return True
         elif self.sampling_mode == "random":
             return True
+
+        should_keep = np.random.rand()
+        if should_keep > self.sampling_thresh:
+            return True
         else:
-            should_keep = np.random.rand()
-            if should_keep > self.sampling_thresh:
-                return True
-            else:
-                return False
+            return False
 
     def __get_external_item__(self):
         """
@@ -346,10 +346,10 @@ class InMemoryTrainDataset(Dataset):
         
         h, w, _ = img.shape
         img = cv2.resize(img,
-                         (h//self.reduce_factor, w//self.reduce_factor),
+                         (2*h//self.reduce_factor, 2*w//self.reduce_factor),
                          interpolation=cv2.INTER_AREA)
         mask = cv2.resize(mask,
-                         (h//self.reduce_factor, w//self.reduce_factor),
+                         (2*h//self.reduce_factor, 2*w//self.reduce_factor),
                          interpolation=cv2.INTER_NEAREST)
 
         if self.transforms:
@@ -374,7 +374,6 @@ class InMemoryTrainDataset(Dataset):
                     range(len(self.used_img_idx)), replace=True, p=self.sampling_probs
                 )
             ]
-
         img_dim = self.image_sizes[image_nb]
         is_point_ok = False
 
