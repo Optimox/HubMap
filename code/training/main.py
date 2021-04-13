@@ -102,7 +102,7 @@ def validate(model, config, val_images):
             overlap_factor=config.overlap_factor,
             tile_size=config.tile_size,
             reduce_factor=1,
-            transforms=HE_preprocess(augment=False, visualize=False),
+            transforms=HE_preprocess(augment=False, visualize=False, size=config.tile_size),
         )
 
         global_pred = predict_entire_mask_downscaled(
@@ -149,7 +149,8 @@ def k_fold(config, log_folder=None):
         train_path=f"../input/train_{config.reduce_factor}/",
         iter_per_epoch=config.iter_per_epoch,
         on_spot_sampling=config.on_spot_sampling,
-        sampling_mode=config.sampling_mode
+        sampling_mode=config.sampling_mode,
+        use_external=config.use_external,
     )
     print(f"Done in {time.time() - start_time :.0f} seconds.")
 

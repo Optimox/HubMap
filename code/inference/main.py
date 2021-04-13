@@ -55,7 +55,7 @@ def validate_inf(
             overlap_factor=config.overlap_factor,
             reduce_factor=reduce_factor,
             tile_size=config.tile_size,
-            transforms=HE_preprocess(augment=False, visualize=False),
+            transforms=HE_preprocess(augment=False, visualize=False, size=config.tile_size),
         )
 
         if use_full_size:

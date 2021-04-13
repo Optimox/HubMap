@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import albumentations as albu
 from albumentations.pytorch import ToTensorV2
-
+from albumentations.core.transforms_interface import ImageOnlyTransform
 from params import MEAN, STD
 
 
@@ -36,7 +36,52 @@ def lab_normalization(img, mean=None, std=None):
     return (img_n * 255).astype(np.uint8)
 
 
-def blur_transforms(p=0.5, blur_limit=5, gaussian_limit=(5, 7)):
+# from here : https://github.com/hendrycks/robustness/blob/master/ImageNet-C/create_c/make_imagenet_c.py
+# and here : https://github.com/albumentations-team/albumentations/issues/477
+def disk(radius, alias_blur=0.1, dtype=np.float32):
+    if radius <= 8:
+        L = np.arange(-8, 8 + 1)
+        ksize = (3, 3)
+    else:
+        L = np.arange(-radius, radius + 1)
+        ksize = (5, 5)
+    X, Y = np.meshgrid(L, L)
+    aliased_disk = np.array((X ** 2 + Y ** 2) <= radius ** 2, dtype=dtype)
+    aliased_disk /= np.sum(aliased_disk)
+
+    # supersample disk to antialias
+    return cv2.GaussianBlur(aliased_disk, ksize=ksize, sigmaX=alias_blur)
+
+
+class DefocusBlur(ImageOnlyTransform):
+    """Apply Defocus Blur to mimic defocus on slides
+    
+    - severity : int between 1 and 5
+    """
+
+    def __init__(
+        self,
+        severity=1,
+        always_apply=False,
+        p=1.0,
+    ):
+        super(DefocusBlur, self).__init__(always_apply, p)
+        self.severity = severity
+        self.radius, self.blur = [(3, 0.1), (4, 0.5), (6, 0.5), (8, 0.5), (10, 0.5)][self.severity - 1]
+        
+    def apply(self, image, **params):
+        image = np.array(image) / 255.
+        kernel = disk(radius=self.radius, alias_blur=self.blur)
+        channels = []
+        for d in range(3):
+            channels.append(cv2.filter2D(image[:, :, d], -1, kernel))
+        channels = np.array(channels).transpose((1, 2, 0))
+        return np.clip(channels, 0, 1) * 255
+
+    def get_transform_init_args_names(self):
+        return ("severty")
+
+def blur_transforms(p=0.5, blur_limit=5, gaussian_limit=(5, 7), severity=1):
     # More aggressive : blur_limit=11, gaussian_limit=(11, 11)
     """
     Applies MotionBlur or GaussianBlur random with a probability p.
@@ -49,7 +94,8 @@ def blur_transforms(p=0.5, blur_limit=5, gaussian_limit=(5, 7)):
         albumentation transforms: transforms.
     """
     return albu.OneOf(
-        [
+        [   
+            DefocusBlur(severity=severity, always_apply=True),
             albu.MotionBlur(blur_limit=blur_limit, always_apply=True),
             albu.GaussianBlur(blur_limit=gaussian_limit, always_apply=True),
         ],
@@ -99,21 +145,21 @@ def color_transforms(p=0.5):
                 ]
             ),
             albu.RGBShift(
-                r_shift_limit=10,
+                r_shift_limit=30,
                 g_shift_limit=0,
-                b_shift_limit=10,
+                b_shift_limit=30,
                 p=1,
             ),
             albu.HueSaturationValue(
-                hue_shift_limit=10,
-                sat_shift_limit=10,
+                hue_shift_limit=30,
+                sat_shift_limit=30,
                 val_shift_limit=30,
                 p=1,
             ),
             albu.ColorJitter(
-                brightness=0.1, # 0.3
-                contrast=0.1, # 0.3
-                saturation=0.1,
+                brightness=0.3, # 0.3
+                contrast=0.3, # 0.3
+                saturation=0.3,
                 hue=0.05,
                 p=1,
             ),
@@ -121,13 +167,27 @@ def color_transforms(p=0.5):
         p=p,
     )
 
-
+def deformation_transform(p=0.5):
+    return albu.OneOf(
+        [
+            albu.ElasticTransform(alpha=1, sigma=25, alpha_affine=25,
+                                  border_mode=cv2.BORDER_CONSTANT, value=0,
+                                  always_apply=True),
+            albu.GridDistortion(always_apply=True),
+            albu.OpticalDistortion(distort_limit=1, shift_limit=0.2, always_apply=True)
+        ],
+        p=p,
+    )
 def center_crop(size):
     if size is None:  # disable cropping
         p = 0
     else:  # always crop
         p = 1
-    return albu.CenterCrop(size, size, p=p)
+
+    return albu.Compose(
+        [albu.PadIfNeeded(size, size, p=p, border_mode=cv2.BORDER_CONSTANT),
+         albu.CenterCrop(size, size, p=p)],
+        p=1)
 
 
 def HE_preprocess(augment=True, visualize=False, mean=MEAN, std=STD, size=None):
@@ -168,6 +228,7 @@ def HE_preprocess(augment=True, visualize=False, mean=MEAN, std=STD, size=None):
                     rotate_limit=90,
                     p=0.5
                 ),
+                deformation_transform(p=0.5),
                 color_transforms(p=0.5),
                 blur_transforms(p=0.5),
                 normalizer,

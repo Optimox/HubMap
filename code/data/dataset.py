@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import pandas as pd
 import tifffile as tiff
-
+from pathlib import Path
 from torch.utils.data import Dataset
 
 from params import DATA_PATH, LAB_STATS  # noqa
@@ -192,6 +192,12 @@ class InMemoryTrainDataset(Dataset):
         - on_sport_samping : float between 0 and 1, probability of rejection outside conv hull
                              (1. means only intersting tiles, 0 purely random tiles)
         - fold_nb : which fold are we considereing at the moment (everything is in RAM)
+        - sampling_mode:
+            - centered : center of image should contain glomuleri
+            - convhull : will use conv_hull only
+            - random : any
+            - visible : tile should have at least 2K pixels as glomuleri
+        - use_external : None or float of probability
     """
 
     def __init__(
@@ -207,14 +213,16 @@ class InMemoryTrainDataset(Dataset):
         on_spot_sampling=0.9,
         fold_nb=0,
         sampling_mode="convhull",
+        use_external=None,
     ):
         """
-        possible mode:
-            - centered : center of image should contain glomuleri
-            - convhull : will use conv_hull only
-            - random : any
-            - visible : tile should have at least 2K pixels as glomuleri
         """
+        # Hard coded external path for now
+        self.ext_img_path = '../input/external_data/images_1024/'
+        self.ext_msk_path = '../input/external_data/masks_1024/'
+        self.external_names = [p.name for p in Path(self.ext_img_path).glob("*")]
+        self.use_external = use_external
+
         self.sampling_mode = sampling_mode
         assert self.sampling_mode in ["centered", "convhull", "random", "visible"]
         self.iter_per_epoch = iter_per_epoch
@@ -241,7 +249,6 @@ class InMemoryTrainDataset(Dataset):
         for img_name in self.train_img_names:
             img = simple_load(os.path.join(train_path, img_name + ".tiff"))
             orig_img_size = img.shape
-
             img_size = img.shape
 
             rle = df_rle.loc[df_rle.id == img_name, "encoding"]
@@ -316,12 +323,40 @@ class InMemoryTrainDataset(Dataset):
                 return True
         elif self.sampling_mode == "random":
             return True
+
+        should_keep = np.random.rand()
+        if should_keep > self.sampling_thresh:
+            return True
         else:
-            should_keep = np.random.rand()
-            if should_keep > self.sampling_thresh:
-                return True
-            else:
-                return False
+            return False
+
+    def __get_external_item__(self):
+        """
+        Randomly selects an external image
+        """
+        img_name = np.random.choice(self.external_names)
+        img = cv2.cvtColor(
+                    cv2.imread(os.path.join(self.ext_img_path, img_name)),
+                    cv2.COLOR_BGR2RGB
+                    )
+
+        mask = cv2.imread(os.path.join(self.ext_msk_path, img_name),
+                          cv2.IMREAD_GRAYSCALE)
+        
+        h, w, _ = img.shape
+        img = cv2.resize(img,
+                         (h//self.reduce_factor, w//self.reduce_factor),
+                         interpolation=cv2.INTER_AREA)
+        mask = cv2.resize(mask,
+                         (h//self.reduce_factor, w//self.reduce_factor),
+                         interpolation=cv2.INTER_NEAREST)
+
+        if self.transforms:
+            augmented = self.transforms(image=img, mask=mask)
+            img = augmented["image"]
+            mask = augmented["mask"]
+
+        return img, mask
 
     def __getitem__(self, idx):
 
@@ -329,12 +364,15 @@ class InMemoryTrainDataset(Dataset):
             # take uniformly from images for validation
             image_nb = self.used_img_idx[idx % len(self.used_img_idx)]
         else:
+            if self.use_external is not None:
+                should_use_ext = np.random.rand()
+                if should_use_ext < self.use_external:
+                    return self.__get_external_item__()
             image_nb = self.used_img_idx[
                 np.random.choice(
                     range(len(self.used_img_idx)), replace=True, p=self.sampling_probs
                 )
             ]
-
         img_dim = self.image_sizes[image_nb]
         is_point_ok = False
 
