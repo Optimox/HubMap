@@ -41,6 +41,7 @@ def train(config, dataset, fold, log_folder=None):
         input_size=config.tile_size,
         use_bot=config.use_bot,
         use_fpn=config.use_fpn,
+        use_mixstyle=config.use_mixstyle,
     ).to(config.device)
     model.zero_grad()
 
@@ -64,6 +65,8 @@ def train(config, dataset, fold, log_folder=None):
         lr=config.lr,
         warmup_prop=config.warmup_prop,
         swa_first_epoch=config.swa_first_epoch,
+        mix_proba=config.mix_proba,
+        mix_alpha=config.mix_alpha,
         verbose=config.verbose,
         first_epoch_eval=config.first_epoch_eval,
         device=config.device,

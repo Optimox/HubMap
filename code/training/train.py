@@ -1,13 +1,14 @@
 import time
 import torch
-import numpy as np  # noqa
+import numpy as np
 
 from torchcontrib.optim import SWA
 from torch.utils.data import DataLoader
 from transformers import get_linear_schedule_with_warmup
 
 from params import NUM_WORKERS
-from training.mix import cutmix_data  # noqa
+from training.mix import cutmix_data
+from utils.torch import worker_init_fn
 from utils.logger import update_history
 from training.meter import SegmentationMeter
 from training.optim import define_loss, define_optimizer, prepare_for_loss
@@ -25,6 +26,8 @@ def fit(
     warmup_prop=0.1,
     lr=1e-3,
     swa_first_epoch=50,
+    mix_proba=0,
+    mix_alpha=0.4,
     verbose=1,
     first_epoch_eval=0,
     device="cuda",
@@ -45,6 +48,8 @@ def fit(
         warmup_prop (float, optional): Warmup proportion. Defaults to 0.1.
         lr (float, optional): Learning rate. Defaults to 1e-3.
         swa_first_epoch (int, optional): Epoch to start applying SWA from. Defaults to 50.
+        mix_proba (float, optional): Probability to apply mixup with. Defaults to 0.
+        mix_alpha (float, optional): Mixup alpha parameter. Defaults to 0.4.
         verbose (int, optional): Period (in epochs) to display logs at. Defaults to 1.
         first_epoch_eval (int, optional): Epoch to start evaluating at. Defaults to 0.
         device (str, optional): Device for torch. Defaults to "cuda".
@@ -72,7 +77,8 @@ def fit(
         batch_size=batch_size,
         drop_last=False,
         num_workers=NUM_WORKERS,
-        pin_memory=True
+        pin_memory=True,
+        worker_init_fn=worker_init_fn
     )
 
     meter = SegmentationMeter()
@@ -98,10 +104,8 @@ def fit(
             x = batch[0].to(device).float()
             y_batch = batch[1].float()
 
-            # mix_proba = 0.25
-            # mix_alpha = 0.5
-            # if np.random.random() > mix_proba:
-            #     x, y_batch = cutmix_data(x, y_batch, alpha=mix_alpha, device=device)
+            if np.random.random() > mix_proba:
+                x, y_batch = cutmix_data(x, y_batch, alpha=mix_alpha, device=device)
 
             if use_fp16:
                 with torch.cuda.amp.autocast():

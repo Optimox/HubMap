@@ -1,6 +1,7 @@
 import segmentation_models_pytorch
 from segmentation_models_pytorch.encoders import encoders
 
+from model_zoo.mixstyle import EfficientNetMixStyleEncoder
 from model_zoo.custom_unet import BotUnetDecoder, DoubleUNet
 
 
@@ -27,6 +28,7 @@ def define_model(
     double_model=False,
     use_bot=False,
     use_fpn=False,
+    use_mixstyle=False,
 ):
     """
     Loads a segmentation architecture.
@@ -74,6 +76,17 @@ def define_model(
             num_classes=num_classes,
             encoder_weights=encoder_weights,
         )
+
+    if use_mixstyle:
+        if "efficientnet" in encoder_name:
+            model.encoder = EfficientNetMixStyleEncoder(
+                stage_idxs=model.encoder._stage_idxs,
+                out_channels=model.encoder._out_channels,
+                model_name=encoder_name,
+                depth=model.encoder._depth,
+            )
+        else:
+            raise NotImplementedError
 
     return model
 
