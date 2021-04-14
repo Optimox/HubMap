@@ -1,5 +1,6 @@
 import os
 import cv2
+import torch
 import numpy as np
 import pandas as pd
 import tifffile as tiff
@@ -215,11 +216,10 @@ class InMemoryTrainDataset(Dataset):
         sampling_mode="convhull",
         use_external=None,
     ):
-        """
-        """
+        """"""
         # Hard coded external path for now
-        self.ext_img_path = '../input/external_data/images_1024/'
-        self.ext_msk_path = '../input/external_data/masks_1024/'
+        self.ext_img_path = "../input/external_data/images_1024/"
+        self.ext_msk_path = "../input/external_data/masks_1024/"
         self.external_names = [p.name for p in Path(self.ext_img_path).glob("*")]
         self.use_external = use_external
 
@@ -336,20 +336,24 @@ class InMemoryTrainDataset(Dataset):
         """
         img_name = np.random.choice(self.external_names)
         img = cv2.cvtColor(
-                    cv2.imread(os.path.join(self.ext_img_path, img_name)),
-                    cv2.COLOR_BGR2RGB
-                    )
+            cv2.imread(os.path.join(self.ext_img_path, img_name)), cv2.COLOR_BGR2RGB
+        )
 
-        mask = cv2.imread(os.path.join(self.ext_msk_path, img_name),
-                          cv2.IMREAD_GRAYSCALE)
-        
+        mask = cv2.imread(
+            os.path.join(self.ext_msk_path, img_name), cv2.IMREAD_GRAYSCALE
+        )
+
         h, w, _ = img.shape
-        img = cv2.resize(img,
-                         (h//self.reduce_factor, w//self.reduce_factor),
-                         interpolation=cv2.INTER_AREA)
-        mask = cv2.resize(mask,
-                         (h//self.reduce_factor, w//self.reduce_factor),
-                         interpolation=cv2.INTER_NEAREST)
+        img = cv2.resize(
+            img,
+            (h // self.reduce_factor, w // self.reduce_factor),
+            interpolation=cv2.INTER_AREA,
+        )
+        mask = cv2.resize(
+            mask,
+            (h // self.reduce_factor, w // self.reduce_factor),
+            interpolation=cv2.INTER_NEAREST,
+        )
 
         if self.transforms:
             augmented = self.transforms(image=img, mask=mask)
@@ -395,3 +399,44 @@ class InMemoryTrainDataset(Dataset):
             mask = augmented["mask"]
 
         return img, mask
+
+
+class TileClsDataset(Dataset):
+    """
+    Dataset to read from tiled images.
+    """
+
+    def __init__(self, images, root="", transforms=None):
+        """
+        Args:
+            df (pandas dataframe): file_names.
+            img_dir (str, optional): Images directory. Defaults to "".
+            mask_dir (str, optional): Masks directory. Defaults to "".
+            transforms (albumentation transforms, optional) : Transforms. Defaults to None.
+        """
+        self.df = images
+        self.tiles = [root + p for p in os.listdir(root) if p.split("_")[0] in images]
+
+        self.transforms = transforms
+
+    def __len__(self):
+        return len(self.tiles)
+
+    def __getitem__(self, idx):
+        tile = np.load(self.tiles[idx])
+
+        img, mask = tile[:, :, :-2], tile[:, :, -2:]
+
+        img = (img * 255).astype(np.uint8)
+
+        target = mask[:, :, -1][mask.shape[0] // 2, mask.shape[1] // 2]
+
+        if self.transforms:
+            augmented = self.transforms(image=img, mask=mask)
+            img = augmented["image"]
+            mask = augmented["mask"]
+
+        img = torch.cat([img, mask[:, :, 0].unsqueeze(0)], 0)
+        mask = mask[:, :, -1]
+
+        return img, mask, target

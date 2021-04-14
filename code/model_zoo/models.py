@@ -12,7 +12,7 @@ DECODERS = [
     "DeepLabV3",
     "DeepLabV3Plus",
     "PAN",
-    "BoTUnet",
+    "UnetPlusPlus",
 ]
 ENCODERS = list(encoders.keys())
 

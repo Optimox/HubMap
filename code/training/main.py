@@ -83,7 +83,6 @@ def train(config, dataset, fold, log_folder=None):
 
 def validate(model, config, val_images):
     """
-    # WARNING : THIS WILL NOT WORK WITH REDUCE_FACTOR != 4     -> No longer true ?
     Quick model validation on full images.
     Validation is performed on downscaled images.
 

@@ -1,11 +1,13 @@
 import time
 import torch
+import numpy as np  # noqa
 
 from torchcontrib.optim import SWA
 from torch.utils.data import DataLoader
 from transformers import get_linear_schedule_with_warmup
 
 from params import NUM_WORKERS
+from training.mix import cutmix_data  # noqa
 from utils.logger import update_history
 from training.meter import SegmentationMeter
 from training.optim import define_loss, define_optimizer, prepare_for_loss
@@ -95,6 +97,11 @@ def fit(
         for batch in data_loader:
             x = batch[0].to(device).float()
             y_batch = batch[1].float()
+
+            # mix_proba = 0.25
+            # mix_alpha = 0.5
+            # if np.random.random() > mix_proba:
+            #     x, y_batch = cutmix_data(x, y_batch, alpha=mix_alpha, device=device)
 
             if use_fp16:
                 with torch.cuda.amp.autocast():
