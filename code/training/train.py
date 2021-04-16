@@ -13,6 +13,14 @@ from training.meter import SegmentationMeter
 from training.optim import define_loss, define_optimizer, prepare_for_loss
 
 
+def numpy_init_fn(worker_id):
+    """
+    Deal with numpy murlti thread seed error:
+    https://www.kaggle.com/c/bms-molecular-translation/discussion/231961
+    """
+    np.random.seed(np.random.get_state()[1][0] + worker_id)
+
+
 def fit(
     model,
     dataset,
@@ -72,7 +80,8 @@ def fit(
         batch_size=batch_size,
         drop_last=False,
         num_workers=NUM_WORKERS,
-        pin_memory=True
+        pin_memory=True,
+        worker_init_fn=numpy_init_fn,
     )
 
     meter = SegmentationMeter()

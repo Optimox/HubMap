@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-NUM_WORKERS = 2
+NUM_WORKERS = 8
 
 DATA_PATH = "../input/"
 TIFF_PATH = DATA_PATH + "train/"
