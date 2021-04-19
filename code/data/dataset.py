@@ -1,5 +1,6 @@
 import os
 import cv2
+import json
 import torch
 import numpy as np
 import pandas as pd
@@ -215,6 +216,7 @@ class InMemoryTrainDataset(Dataset):
         fold_nb=0,
         sampling_mode="convhull",
         use_external=None,
+        oof_folder=None,
     ):
         """"""
         # Hard coded external path for now
@@ -266,6 +268,17 @@ class InMemoryTrainDataset(Dataset):
         # Deal with fold inside this to avoid reloading for each fold (time consuming)
         self.update_fold_nb(self.fold_nb)
         self.train(True)
+
+        # Load in memory all oof preds. Expects them to be of the same reduce factor for now
+        if oof_folder is not None:
+            config = json.load(open(oof_folder + 'config.json', 'r'))
+            assert config['reduce_factor'] == reduce_factor, 'Different prediction reduce factor'
+
+            self.oof_preds = []
+            for img_name in self.train_img_names:
+                self.oof_preds.append(np.load(oof_folder + f'pred_{img_name}.npy'))
+        else:
+            self.oof_preds = None
 
     def train(self, is_train):
         # Switch to train mode
@@ -360,7 +373,13 @@ class InMemoryTrainDataset(Dataset):
             img = augmented["image"]
             mask = augmented["mask"]
 
-        return img, mask
+        if self.oof_preds is not None:  # not actually available
+            mask = mask.float()
+            oof_pred = mask.clone()
+        else:
+            oof_pred = 0
+
+        return img, mask, oof_pred
 
     def __getitem__(self, idx):
 
@@ -393,12 +412,21 @@ class InMemoryTrainDataset(Dataset):
         img = self.imgs[image_nb][x1:x2, y1:y2]
         mask = self.masks[image_nb][x1:x2, y1:y2]
 
+        if self.oof_preds is not None:
+            oof_pred = self.oof_preds[image_nb][x1:x2, y1:y2].astype(np.float32)
+            mask = np.array([mask, oof_pred]).transpose(1, 2, 0)
+
         if self.transforms:
             augmented = self.transforms(image=img, mask=mask)
             img = augmented["image"]
             mask = augmented["mask"]
 
-        return img, mask
+        if self.oof_preds is not None:
+            mask, oof_pred = mask[:, :, 0], mask[:, :, 1]
+        else:
+            oof_pred = 0.
+
+        return img, mask, oof_pred
 
 
 class TileClsDataset(Dataset):

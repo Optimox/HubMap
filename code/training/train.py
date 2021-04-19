@@ -28,6 +28,7 @@ def fit(
     swa_first_epoch=50,
     mix_proba=0,
     mix_alpha=0.4,
+    loss_oof_weight=0,
     verbose=1,
     first_epoch_eval=0,
     device="cuda",
@@ -50,6 +51,7 @@ def fit(
         swa_first_epoch (int, optional): Epoch to start applying SWA from. Defaults to 50.
         mix_proba (float, optional): Probability to apply mixup with. Defaults to 0.
         mix_alpha (float, optional): Mixup alpha parameter. Defaults to 0.4.
+        loss_oof_weight (float, optional): Weight for the oof loss. Defaults to 0.
         verbose (int, optional): Period (in epochs) to display logs at. Defaults to 1.
         first_epoch_eval (int, optional): Epoch to start evaluating at. Defaults to 0.
         device (str, optional): Device for torch. Defaults to "cuda".
@@ -103,6 +105,7 @@ def fit(
         for batch in data_loader:
             x = batch[0].to(device).float()
             y_batch = batch[1].float()
+            y_oof = batch[2].float()
 
             if np.random.random() > mix_proba:
                 x, y_batch = cutmix_data(x, y_batch, alpha=mix_alpha, device=device)
@@ -115,6 +118,11 @@ def fit(
 
                     loss = loss_fct(y_pred, y_batch).mean()
 
+                    if loss_oof_weight > 0:
+                        y_oof = y_oof.to(device)
+                        loss_oof = loss_fct(y_pred, y_oof).mean()
+                        loss = (loss + loss_oof * loss_oof_weight) / (1 + loss_oof_weight)
+
                     scaler.scale(loss).backward()
 
                     avg_loss += loss.item() / len(data_loader)
@@ -126,6 +134,11 @@ def fit(
 
                 y_pred, y_batch = prepare_for_loss(y_pred, y_batch, loss_name, device=device)
                 loss = loss_fct(y_pred, y_batch).mean()
+
+                if loss_oof_weight > 0:
+                    y_oof = y_oof.to(device)
+                    loss_oof = loss_fct(y_pred, y_oof).mean()
+                    loss = (loss + loss_oof * loss_oof_weight) / (1 + loss_oof_weight)
 
                 loss.backward()
                 avg_loss += loss.item() / len(data_loader)
@@ -150,6 +163,7 @@ def fit(
                 for batch in data_loader:
                     x = batch[0].to(device).float()
                     y_batch = batch[1].float()
+                    y_oof = batch[2].float()
 
                     y_pred = model(x)
 
@@ -162,6 +176,12 @@ def fit(
                     )
 
                     loss = loss_fct(y_pred, y_batch).mean()
+
+                    if loss_oof_weight > 0:
+                        y_oof = y_oof.to(device)
+                        loss_oof = loss_fct(y_pred, y_oof).mean()
+                        loss = (loss + loss_oof * loss_oof_weight) / (1 + loss_oof_weight)
+
                     avg_val_loss += loss / len(data_loader)
 
                     if activation == "sigmoid":

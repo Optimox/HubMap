@@ -67,6 +67,7 @@ def train(config, dataset, fold, log_folder=None):
         swa_first_epoch=config.swa_first_epoch,
         mix_proba=config.mix_proba,
         mix_alpha=config.mix_alpha,
+        loss_oof_weight=config.loss_oof_weight,
         verbose=config.verbose,
         first_epoch_eval=config.first_epoch_eval,
         device=config.device,
@@ -153,6 +154,7 @@ def k_fold(config, log_folder=None):
         on_spot_sampling=config.on_spot_sampling,
         sampling_mode=config.sampling_mode,
         use_external=config.use_external,
+        oof_folder=config.oof_folder,
     )
     print(f"Done in {time.time() - start_time :.0f} seconds.")
 

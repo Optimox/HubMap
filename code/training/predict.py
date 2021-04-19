@@ -22,7 +22,7 @@ def threshold_resize(preds, shape, threshold=0.5):
 def threshold_resize_torch(preds, shape, threshold=0.5):
     preds = preds.unsqueeze(0).unsqueeze(0)
     preds = torch.nn.functional.interpolate(
-        preds, (shape[1], shape[0]), mode='area'
+        preds, (shape[1], shape[0]), mode='bilinear', align_corners=False
     )
     return (preds > threshold).cpu().numpy()[0, 0]
 
