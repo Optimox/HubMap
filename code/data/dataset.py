@@ -20,20 +20,27 @@ def load_image(img_path, full_size=True):
     """
     df_info = pd.read_csv(DATA_PATH + "HuBMAP-20-dataset_information.csv")
     image_fname = img_path.rsplit("/", -1)[-1]
-    W = int(df_info[df_info.image_file == image_fname]["width_pixels"])
-    H = int(df_info[df_info.image_file == image_fname]["height_pixels"])
-
-    if not full_size:
-        W = W // 4
-        H = H // 4
 
     img = tiff.imread(img_path).squeeze()
 
-    channel_pos = np.argwhere(np.array(img.shape) == 3)[0][0]
-    W_pos = np.argwhere(np.array(img.shape) == W)[0][0]
-    H_pos = np.argwhere(np.array(img.shape) == H)[0][0]
+    try:
+        W = int(df_info[df_info.image_file == image_fname]["width_pixels"])
+        H = int(df_info[df_info.image_file == image_fname]["height_pixels"])
 
-    img = np.moveaxis(img, (H_pos, W_pos, channel_pos), (0, 1, 2))
+        if not full_size:
+            W = W // 4
+            H = H // 4
+
+        channel_pos = np.argwhere(np.array(img.shape) == 3)[0][0]
+        W_pos = np.argwhere(np.array(img.shape) == W)[0][0]
+        H_pos = np.argwhere(np.array(img.shape) == H)[0][0]
+
+        img = np.moveaxis(img, (H_pos, W_pos, channel_pos), (0, 1, 2))
+
+    except TypeError:  # image_fname not in df
+        if img.shape[0] == 3:
+            img = img.transpose(1, 2, 0)
+
     return img
 
 
@@ -45,46 +52,6 @@ def simple_load(img_path):
     if img.shape[0] == 3:
         img = img.transpose(1, 2, 0)
     return img
-
-
-class TileDataset(Dataset):
-    """
-    Dataset to read from tiled images.
-    """
-
-    def __init__(self, df, img_dir="", mask_dir="", transforms=None):
-        """
-        Args:
-            df (pandas dataframe): file_names.
-            img_dir (str, optional): Images directory. Defaults to "".
-            mask_dir (str, optional): Masks directory. Defaults to "".
-            transforms (albumentation transforms, optional) : Transforms. Defaults to None.
-        """
-        self.df = df
-        self.img_dir = img_dir
-        self.mask_dir = mask_dir
-        self.transforms = transforms
-
-    def __len__(self):
-        return self.df.shape[0]
-
-    def __getitem__(self, idx):
-        tile_name = self.df.loc[idx, "tile_name"]
-
-        img = cv2.cvtColor(
-            cv2.imread(os.path.join(self.img_dir, tile_name)), cv2.COLOR_BGR2RGB
-        )
-
-        # mean, std = LAB_STATS[tile_name.split("_")[0]]
-        # img = lab_normalization(img)  # , mean=mean, std=std)
-
-        mask = cv2.imread(os.path.join(self.mask_dir, tile_name), cv2.IMREAD_GRAYSCALE)
-
-        if self.transforms:
-            augmented = self.transforms(image=img, mask=mask)
-            img = augmented["image"]
-            mask = augmented["mask"]
-        return img, mask
 
 
 class InferenceDataset(Dataset):

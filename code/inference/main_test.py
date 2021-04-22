@@ -10,9 +10,9 @@ from training.predict import (
 from model_zoo.models import define_model
 
 from data.dataset import InferenceDataset
-from data.transforms import HE_preprocess
+from data.transforms import HE_preprocess_test
 from utils.torch import load_model_weights
-from params import TIFF_PATH_TEST, DATA_PATH
+from params import TIFF_PATH_TEST, DATA_PATH, EXTRA_IMGS_SHAPES
 
 
 def validate_inf_test(
@@ -44,7 +44,7 @@ def validate_inf_test(
             overlap_factor=config.overlap_factor,
             reduce_factor=reduce_factor,
             tile_size=config.tile_size,
-            transforms=HE_preprocess(augment=False, visualize=False),
+            transforms=HE_preprocess_test(augment=False, visualize=False),
         )
 
         if use_full_size:
@@ -64,9 +64,12 @@ def validate_inf_test(
             )
 
         if not use_full_size:
-            shape = df_info[df_info.image_file == img + ".tiff"][
-                ["width_pixels", "height_pixels"]
-            ].values.astype(int)[0]
+            try:
+                shape = df_info[df_info.image_file == img + ".tiff"][
+                    ["width_pixels", "height_pixels"]
+                ].values.astype(int)[0]
+            except IndexError:
+                shape = EXTRA_IMGS_SHAPES[img]
 
             global_pred = threshold_resize_torch(
                 global_pred, shape, threshold=global_threshold
@@ -77,7 +80,7 @@ def validate_inf_test(
 
 def k_fold_inf_test(
     config,
-    df,
+    images,
     log_folder=None,
     use_full_size=True,
     global_threshold=None,
@@ -90,7 +93,6 @@ def k_fold_inf_test(
         df (pandas dataframe): Metadata.
         log_folder (None or str, optional): Folder to logs results to. Defaults to None.
     """
-    images = df['id'].values
     for fold in range(5):
         if fold in config.selected_folds:
             print(f"\n-------------   Fold {fold + 1} / {5}  -------------\n")

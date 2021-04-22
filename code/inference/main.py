@@ -11,7 +11,7 @@ from training.predict import (
 from model_zoo.models import define_model
 
 from data.dataset import InferenceDataset
-from data.transforms import HE_preprocess
+from data.transforms import HE_preprocess_test
 
 from utils.rle import enc2mask
 from utils.torch import load_model_weights
@@ -55,7 +55,7 @@ def validate_inf(
             overlap_factor=config.overlap_factor,
             reduce_factor=reduce_factor,
             tile_size=config.tile_size,
-            transforms=HE_preprocess(augment=False, visualize=False, size=config.tile_size),
+            transforms=HE_preprocess_test(augment=False, visualize=False),
         )
 
         if use_full_size:
