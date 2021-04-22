@@ -291,6 +291,51 @@ def HE_preprocess(augment=True, visualize=False, mean=MEAN, std=STD, size=None):
         return normalizer
 
 
+def stardist_preprocess(augment=True, visualize=False, mean=MEAN, std=STD, size=None):
+    """
+    Returns transformations for the H&E images.
+
+    Args:
+        augment (bool, optional): Whether to apply augmentations. Defaults to True.
+        visualize (bool, optional): Whether to use transforms for visualization. Defaults to False.
+        mean ([type], optional): Mean for normalization. Defaults to MEAN.
+        std ([type], optional): Standard deviation for normalization. Defaults to STD.
+
+    Returns:
+        albumentation transforms: transforms.
+    """
+    if visualize:
+        normalizer = albu.Compose(
+            [
+                albu.Normalize(mean=[0, 0, 0], std=[1, 1, 1]),
+            ],
+            p=1,
+        )
+    else:
+        normalizer = albu.Compose(
+            [albu.Normalize(mean=mean, std=std)], p=1
+        )
+
+    if augment:
+        return albu.Compose(
+            [
+                albu.VerticalFlip(p=0.5),
+                albu.HorizontalFlip(p=0.5),
+                albu.ShiftScaleRotate(
+                    scale_limit=0.1,  # 0
+                    shift_limit=0.1,  # 0.05
+                    rotate_limit=90,
+                    p=0.5,
+                ),
+                deformation_transform(p=0.5),
+                color_transforms(p=0.5),
+                blur_transforms(p=0.5),
+                normalizer,
+            ]
+        )
+    else:
+        return normalizer
+
 def HE_preprocess_test(augment=False, visualize=False, mean=MEAN, std=STD):
     """
     Returns transformations for the H&E images.
