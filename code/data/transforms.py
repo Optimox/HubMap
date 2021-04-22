@@ -199,7 +199,7 @@ def color_transforms(p=0.5):
                 hue=0.05,
                 p=1,
             ),
-            HEDJitter(theta=0.06, p=1),
+            #HEDJitter(theta=0.06, p=1),
         ],
         p=p,
     )

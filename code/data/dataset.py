@@ -1,4 +1,5 @@
 import os
+import glob
 import cv2
 import torch
 import numpy as np
@@ -215,14 +216,11 @@ class InMemoryTrainDataset(Dataset):
         fold_nb=0,
         sampling_mode="convhull",
         use_external=None,
+        use_pseudo_label=None,
+        soft_labels=False,
     ):
         """"""
-        # Hard coded external path for now
-        self.ext_img_path = "../input/external_data/images_1024/"
-        self.ext_msk_path = "../input/external_data/masks_1024/"
-        self.external_names = [p.name for p in Path(self.ext_img_path).glob("*")]
-        self.use_external = use_external
-
+        self.reduce_factor = reduce_factor
         self.sampling_mode = sampling_mode
         assert self.sampling_mode in ["centered", "convhull", "random", "visible"]
         self.iter_per_epoch = iter_per_epoch
@@ -230,11 +228,33 @@ class InMemoryTrainDataset(Dataset):
         # Allows to make heavier transfo without artefact by center cropping
         self.before_crop_size = int(1.5 * self.train_tile_size)
 
-        self.reduce_factor = reduce_factor
+        
         self.tile_size = train_tile_size * reduce_factor
         self.on_spot_sampling = on_spot_sampling
         self.train_transfo = train_transfo
         self.valid_transfo = valid_transfo
+
+        # Hard coded external path for now
+        self.ext_img_path = "../input/external_data/images_1024/"
+        self.ext_msk_path = "../input/external_data/masks_1024/"
+        self.external_names = [p.name for p in Path(self.ext_img_path).glob("*")]
+        self.use_external = use_external
+
+        # Hard coded external path for now
+        self.soft_labels = soft_labels
+        self.use_pseudo_label = use_pseudo_label
+        self.pseudo_images_names = np.array(
+                                        ["57512b7f1",
+                                        "d488c759a",
+                                        "aa05346ff",
+                                        "3589adb90",
+                                        "2ec3f1bb9",
+                                        # "VAN0011-RK-3-10-PAS_registered.ome",
+                                        # "VAN0003-LK-32-21-PAS_registered.ome",
+                                        ] 
+        )
+        if self.use_pseudo_label is not None:
+            self.load_pseudo_images()
 
         self.train_img_names = train_img_names
         self.fold_nb = fold_nb
@@ -287,6 +307,41 @@ class InMemoryTrainDataset(Dataset):
             self.transforms = self.valid_transfo
             self.sampling_thresh = 0
 
+
+    def load_pseudo_images(self):
+        self.pseudo_images = []
+        self.pseudo_img_sizes = []
+        for pseudo_name in self.pseudo_images_names:
+            img_path = glob.glob(f'../input/test/{pseudo_name}.tiff')[0]
+            img = simple_load(img_path)
+            h, w, _ = img.shape
+            img = cv2.resize(
+                             img,
+                             (w // self.reduce_factor, h // self.reduce_factor),
+                             interpolation=cv2.INTER_AREA,
+                             )
+            self.pseudo_images.append(img)
+            self.pseudo_img_sizes.append(img.shape)
+
+
+    def load_pseudo_masks(self, fold_nb, soft_labels):
+        self.pseudo_masks = []
+        for pseudo_name in self.pseudo_images_names:
+            mask_path = glob.glob(f'../input/external_data/PL/*{pseudo_name}_{fold_nb}.npy')[0]
+            mask = np.load(mask_path) > 0.4
+            mask = mask.astype(np.uint8)
+            h, w = mask.shape
+            mask = cv2.resize(
+                              mask,
+                              (2*w // self.reduce_factor, 2*h // self.reduce_factor),
+                              interpolation=cv2.INTER_NEAREST, # change inerp if soft labels
+                              )
+            if soft_labels:
+                raise NotImplementedError
+                mask = mask > 0.4
+            self.pseudo_masks.append(mask)
+        return
+
     def update_fold_nb(self, fold_nb):
         """
         Allows switching fold without reloading everything
@@ -305,20 +360,37 @@ class InMemoryTrainDataset(Dataset):
         self.train_set = [self.train_img_names[idx] for idx in self.train_img_idx]
         self.valid_set = [self.train_img_names[idx] for idx in self.valid_img_idx]
 
+        if self.use_pseudo_label is not None:
+            # update masks to avoid leakage
+            self.load_pseudo_masks(fold_nb, self.soft_labels)
+
     def __len__(self):
         return self.iter_per_epoch
 
-    def accept_tile_policy(self, image_nb, x1, x2, y1, y2):
+    def accept_tile_policy(self, image_nb, x1, x2, y1, y2, is_pseudo):
         if self.sampling_thresh == 0:
             return True
 
         if self.sampling_mode == "centered":
-            if self.masks[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
+            if is_pseudo:
+                condition = self.pseudo_masks[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]
+            else:
+                condition = self.masks[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]
+            if condition:
                 return True
         elif self.sampling_mode == "convhull":
-            if self.conv_hulls[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
+            if is_pseudo:
+                # CONV HULL DON't exist yet for pseudo
+                condition = True
+            else:
+                condition = self.conv_hulls[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]
+            if condition:
                 return True
         elif self.sampling_mode == "visible":
+            if is_pseudo:
+                condition = self.pseudo_masks[image_nb][x1:x2, y1:y2].sum() > 2000
+            else:
+                condition = self.masks[image_nb][x1:x2, y1:y2].sum() > 2000
             if self.masks[image_nb][x1:x2, y1:y2].sum() > 2000:
                 return True
         elif self.sampling_mode == "random":
@@ -346,12 +418,12 @@ class InMemoryTrainDataset(Dataset):
         h, w, _ = img.shape
         img = cv2.resize(
             img,
-            (h // self.reduce_factor, w // self.reduce_factor),
+            (w // self.reduce_factor, h // self.reduce_factor),
             interpolation=cv2.INTER_AREA,
         )
         mask = cv2.resize(
             mask,
-            (h // self.reduce_factor, w // self.reduce_factor),
+            (w // self.reduce_factor, h // self.reduce_factor),
             interpolation=cv2.INTER_NEAREST,
         )
 
@@ -362,8 +434,24 @@ class InMemoryTrainDataset(Dataset):
 
         return img, mask
 
-    def __getitem__(self, idx):
+    def get_img_dim(self, img_nb, is_pseudo):
+        if is_pseudo:
+            return self.pseudo_img_sizes[img_nb]
+        else:
+            return self.image_sizes[img_nb]
 
+    def select_tile(self, img_nb, is_pseudo, x1, x2, y1, y2):
+        if is_pseudo:
+            img = self.pseudo_images[img_nb][x1:x2, y1:y2]
+            mask = self.pseudo_masks[img_nb][x1:x2, y1:y2]
+        else:
+            img = self.imgs[img_nb][x1:x2, y1:y2]
+            mask = self.masks[img_nb][x1:x2, y1:y2]
+        return img, mask
+
+    def __getitem__(self, idx):
+        
+        is_pseudo=False
         if self.sampling_thresh == 0:
             # take uniformly from images for validation
             image_nb = self.used_img_idx[idx % len(self.used_img_idx)]
@@ -372,12 +460,22 @@ class InMemoryTrainDataset(Dataset):
                 should_use_ext = np.random.rand()
                 if should_use_ext < self.use_external:
                     return self.__get_external_item__()
-            image_nb = self.used_img_idx[
-                np.random.choice(
-                    range(len(self.used_img_idx)), replace=True, p=self.sampling_probs
-                )
-            ]
-        img_dim = self.image_sizes[image_nb]
+
+            if self.use_pseudo_label is not None:
+                should_use_pseudo = np.random.rand()
+                if should_use_pseudo < self.use_pseudo_label:
+                    # make sure that we read pseudo image
+                    is_pseudo = True
+                    image_nb = np.random.choice(range(len(self.pseudo_images_names)),
+                                                replace=True)
+            if is_pseudo is False:
+                # chose train image if not pseudo
+                image_nb = self.used_img_idx[
+                    np.random.choice(
+                        range(len(self.used_img_idx)), replace=True, p=self.sampling_probs
+                    )
+                ]
+        img_dim = self.get_img_dim(image_nb, is_pseudo)
         is_point_ok = False
 
         while not is_point_ok:
@@ -388,10 +486,9 @@ class InMemoryTrainDataset(Dataset):
             y1 = np.random.randint(img_dim[1] - self.before_crop_size)
             y2 = y1 + self.before_crop_size
 
-            is_point_ok = self.accept_tile_policy(image_nb, x1, x2, y1, y2)
+            is_point_ok = self.accept_tile_policy(image_nb, x1, x2, y1, y2, is_pseudo)
 
-        img = self.imgs[image_nb][x1:x2, y1:y2]
-        mask = self.masks[image_nb][x1:x2, y1:y2]
+        img, mask = self.select_tile(image_nb, is_pseudo, x1, x2, y1, y2)
 
         if self.transforms:
             augmented = self.transforms(image=img, mask=mask)

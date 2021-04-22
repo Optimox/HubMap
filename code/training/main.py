@@ -150,6 +150,9 @@ def k_fold(config, log_folder=None):
         on_spot_sampling=config.on_spot_sampling,
         sampling_mode=config.sampling_mode,
         use_external=config.use_external,
+        use_pseudo_label=config.use_pseudo_label,
+        soft_labels=config.soft_labels,
+        
     )
     print(f"Done in {time.time() - start_time :.0f} seconds.")
 
