@@ -4,7 +4,7 @@ import albumentations as albu
 from albumentations.pytorch import ToTensorV2
 from albumentations.core.transforms_interface import ImageOnlyTransform
 from params import MEAN, STD
-
+from skimage import color
 
 # MEAN_LAB = np.array([52.90164, 29.290276, -29.144949])
 # STD_LAB = np.array([12.994737, 10.004983, 8.370835])
@@ -83,6 +83,39 @@ class DefocusBlur(ImageOnlyTransform):
     def get_transform_init_args_names(self):
         return "severty"
 
+class HEDJitter(ImageOnlyTransform):
+    """Apply HED jitter adapted from :
+    https://github.com/gatsby2016/Augmentation-PyTorch-Transforms/
+
+    - theta :float between 0 and 1
+    """
+
+    def __init__(
+        self,
+        theta=0.05,
+        always_apply=False,
+        p=1.0,
+    ):
+        super(HEDJitter, self).__init__(always_apply, p)
+        self.theta = theta
+
+    def apply(self, image, **params):
+        alpha = np.random.uniform(1-self.theta, 1+self.theta, (1, 3))
+        beta = np.random.uniform(-self.theta, self.theta, (1, 3))
+        image = np.array(image)
+        s = np.reshape(color.rgb2hed(image), (-1, 3))
+        ns = alpha * s + beta  # perturbations on HED color space
+        nimg = color.hed2rgb(np.reshape(ns, image.shape))
+
+        imin = nimg.min()
+        imax = nimg.max()
+        if imin==imax:
+            return image
+        rsimg = (255 * (nimg - imin) / (imax - imin)).astype('uint8')
+        return rsimg
+
+    def get_transform_init_args_names(self):
+        return "theta"
 
 def blur_transforms(p=0.5, blur_limit=5, gaussian_limit=(5, 7), severity=1):
     # More aggressive : blur_limit=11, gaussian_limit=(11, 11)
@@ -166,6 +199,7 @@ def color_transforms(p=0.5):
                 hue=0.05,
                 p=1,
             ),
+            HEDJitter(theta=0.06, p=1),
         ],
         p=p,
     )
