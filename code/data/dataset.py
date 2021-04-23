@@ -249,8 +249,8 @@ class InMemoryTrainDataset(Dataset):
                                         "aa05346ff",
                                         "3589adb90",
                                         "2ec3f1bb9",
-                                        # "VAN0011-RK-3-10-PAS_registered.ome",
-                                        # "VAN0003-LK-32-21-PAS_registered.ome",
+                                        "VAN0011-RK-3-10-PAS_registered.ome",
+                                        "VAN0003-LK-32-21-PAS_registered.ome",
                                         ] 
         )
         if self.use_pseudo_label is not None:
@@ -338,7 +338,7 @@ class InMemoryTrainDataset(Dataset):
                               )
             if soft_labels:
                 raise NotImplementedError
-                mask = mask > 0.4
+                # mask = mask > 0.4
             self.pseudo_masks.append(mask)
         return
 
