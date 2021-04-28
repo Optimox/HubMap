@@ -135,7 +135,7 @@ def k_fold(config, log_folder=None):
     print("Creating in-memory dataset ...")
 
     start_time = time.time()
-    df_rle = pd.read_csv(f"../input/train_{config.reduce_factor}.csv")
+    df_rle = pd.read_csv(f"../input/train_new_{config.reduce_factor}.csv")
     train_img_names = df_rle.id.unique()
 
     in_mem_dataset = InMemoryTrainDataset(
