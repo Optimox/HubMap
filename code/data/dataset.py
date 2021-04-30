@@ -14,7 +14,7 @@ from data.transforms import lab_normalization  # noqa
 from skimage.morphology import convex_hull_image
 
 
-def load_image(img_path, full_size=True):
+def load_image(img_path, full_size=True, reduce_factor=4):
     """
     Load image and make sure sizes matches df_info
     """
@@ -28,8 +28,8 @@ def load_image(img_path, full_size=True):
         H = int(df_info[df_info.image_file == image_fname]["height_pixels"])
 
         if not full_size:
-            W = W // 4
-            H = H // 4
+            W = W // reduce_factor
+            H = H // reduce_factor
 
         channel_pos = np.argwhere(np.array(img.shape) == 3)[0][0]
         W_pos = np.argwhere(np.array(img.shape) == W)[0][0]
@@ -182,8 +182,11 @@ class InMemoryTrainDataset(Dataset):
         on_spot_sampling=0.9,
         fold_nb=0,
         sampling_mode="convhull",
-        use_external=None,
+        use_external=0,
         oof_folder=None,
+        df_rle_test=None,
+        test_path="../input/test/",
+        use_pl=0,
     ):
         """"""
         # Hard coded external path for now
@@ -191,6 +194,7 @@ class InMemoryTrainDataset(Dataset):
         self.ext_msk_path = "../input/external_data/masks_1024/"
         self.external_names = [p.name for p in Path(self.ext_img_path).glob("*")]
         self.use_external = use_external
+        self.use_pl = use_pl
 
         self.sampling_mode = sampling_mode
         assert self.sampling_mode in ["centered", "convhull", "random", "visible"]
@@ -211,7 +215,6 @@ class InMemoryTrainDataset(Dataset):
         self.imgs = []
         self.image_sizes = []
         self.masks = []
-
         self.conv_hulls = []
 
         # Load in memory all resized images, masks and conv_hulls
@@ -238,14 +241,52 @@ class InMemoryTrainDataset(Dataset):
 
         # Load in memory all oof preds. Expects them to be of the same reduce factor for now
         if oof_folder is not None:
-            config = json.load(open(oof_folder + 'config.json', 'r'))
-            assert config['reduce_factor'] == reduce_factor, 'Different prediction reduce factor'
+            config = json.load(open(oof_folder + "config.json", "r"))
+            assert (
+                config["reduce_factor"] == reduce_factor
+            ), "Different prediction reduce factor"
 
             self.oof_preds = []
             for img_name in self.train_img_names:
-                self.oof_preds.append(np.load(oof_folder + f'pred_{img_name}.npy'))
+                self.oof_preds.append(np.load(oof_folder + f"pred_{img_name}.npy"))
         else:
             self.oof_preds = None
+
+        # Test data
+        self.imgs_test = []
+        self.image_sizes_test = []
+        self.masks_test = []
+        self.conv_hulls_test = []
+
+        if df_rle_test is not None:
+            for img_name in df_rle_test.id.values:
+                img = simple_load(os.path.join(test_path, img_name + ".tiff"))
+                orig_img_size = img.shape
+
+                rle = df_rle_test.loc[df_rle_test.id == img_name, "predicted"]
+                mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
+
+                img = cv2.resize(
+                    img,
+                    (img.shape[1] // reduce_factor, img.shape[0] // reduce_factor),
+                    interpolation=cv2.INTER_AREA,
+                )
+                mask = cv2.resize(
+                    mask,
+                    (mask.shape[1] // reduce_factor, mask.shape[0] // reduce_factor),
+                    interpolation=cv2.INTER_NEAREST,
+                )
+
+                self.imgs_test.append(img)
+                self.image_sizes_test.append(img.shape)
+                self.masks_test.append(mask)
+
+                if self.sampling_mode == "convhull":
+                    conv_hull = convex_hull_image(mask)
+                    self.conv_hulls_test.append(conv_hull)
+
+        self.sampling_probs_test = np.array([np.sum(mask) for mask in self.masks_test])
+        self.sampling_probs_test = self.sampling_probs_test / np.sum(self.sampling_probs_test)
 
     def train(self, is_train):
         # Switch to train mode
@@ -255,8 +296,8 @@ class InMemoryTrainDataset(Dataset):
             self.sampling_thresh = self.on_spot_sampling
             self.sampling_probs = np.array(
                 [
-                    area
-                    for idx, area in enumerate(self.images_areas)
+                    np.sum(self.masks[idx])
+                    for idx, area in enumerate(self.masks)
                     if idx in self.used_img_idx
                 ]
             )
@@ -288,18 +329,18 @@ class InMemoryTrainDataset(Dataset):
     def __len__(self):
         return self.iter_per_epoch
 
-    def accept_tile_policy(self, image_nb, x1, x2, y1, y2):
+    def accept_tile_policy(self, image_nb, x1, x2, y1, y2, masks, convhulls):
         if self.sampling_thresh == 0:
             return True
 
         if self.sampling_mode == "centered":
-            if self.masks[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
+            if masks[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
                 return True
         elif self.sampling_mode == "convhull":
-            if self.conv_hulls[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
+            if convhulls[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
                 return True
         elif self.sampling_mode == "visible":
-            if self.masks[image_nb][x1:x2, y1:y2].sum() > 2000:
+            if masks[image_nb][x1:x2, y1:y2].sum() > 2000:
                 return True
         elif self.sampling_mode == "random":
             return True
@@ -310,7 +351,7 @@ class InMemoryTrainDataset(Dataset):
         else:
             return False
 
-    def __get_external_item__(self):
+    def get_external_item(self):
         """
         Randomly selects an external image
         """
@@ -348,21 +389,42 @@ class InMemoryTrainDataset(Dataset):
 
         return img, mask, oof_pred
 
-    def __getitem__(self, idx):
+    def getitem_pl(self):
+        image_nb = np.random.choice(
+            range(len(self.imgs_test)), replace=True, p=self.sampling_probs_test
+        )
 
-        if self.sampling_thresh == 0:
-            # take uniformly from images for validation
-            image_nb = self.used_img_idx[idx % len(self.used_img_idx)]
+        img_dim = self.image_sizes_test[image_nb]
+        is_point_ok = False
+        while not is_point_ok:
+            # Sample random point
+            x1 = np.random.randint(img_dim[0] - self.before_crop_size)
+            x2 = x1 + self.before_crop_size
+
+            y1 = np.random.randint(img_dim[1] - self.before_crop_size)
+            y2 = y1 + self.before_crop_size
+
+            is_point_ok = self.accept_tile_policy(
+                image_nb, x1, x2, y1, y2, self.masks_test, self.conv_hulls_test
+            )
+
+        img = self.imgs_test[image_nb][x1:x2, y1:y2]
+        mask = self.masks_test[image_nb][x1:x2, y1:y2]
+
+        if self.transforms:
+            augmented = self.transforms(image=img, mask=mask)
+            img = augmented["image"]
+            mask = augmented["mask"]
+
+        if self.oof_preds is not None:  # not actually available
+            mask = mask.float()
+            oof_pred = mask.clone()
         else:
-            if self.use_external is not None:
-                should_use_ext = np.random.rand()
-                if should_use_ext < self.use_external:
-                    return self.__get_external_item__()
-            image_nb = self.used_img_idx[
-                np.random.choice(
-                    range(len(self.used_img_idx)), replace=True, p=self.sampling_probs
-                )
-            ]
+            oof_pred = 0
+
+        return img, mask, oof_pred
+
+    def getitem_normal(self, image_nb):
         img_dim = self.image_sizes[image_nb]
         is_point_ok = False
 
@@ -374,7 +436,9 @@ class InMemoryTrainDataset(Dataset):
             y1 = np.random.randint(img_dim[1] - self.before_crop_size)
             y2 = y1 + self.before_crop_size
 
-            is_point_ok = self.accept_tile_policy(image_nb, x1, x2, y1, y2)
+            is_point_ok = self.accept_tile_policy(
+                image_nb, x1, x2, y1, y2, self.masks, self.conv_hulls
+            )
 
         img = self.imgs[image_nb][x1:x2, y1:y2]
         mask = self.masks[image_nb][x1:x2, y1:y2]
@@ -391,9 +455,28 @@ class InMemoryTrainDataset(Dataset):
         if self.oof_preds is not None:
             mask, oof_pred = mask[:, :, 0], mask[:, :, 1]
         else:
-            oof_pred = 0.
+            oof_pred = 0
 
         return img, mask, oof_pred
+
+    def __getitem__(self, idx):
+
+        if self.sampling_thresh == 0:  # take uniformly from images for validation
+            image_nb = self.used_img_idx[idx % len(self.used_img_idx)]
+        else:
+            if np.random.rand() < self.use_external:
+                return self.get_external_item()
+
+            if np.random.rand() < self.use_pl:
+                return self.getitem_pl()
+
+            image_nb = self.used_img_idx[
+                np.random.choice(
+                    range(len(self.used_img_idx)), replace=True, p=self.sampling_probs
+                )
+            ]
+
+        return self.getitem_normal(image_nb)
 
 
 class TileClsDataset(Dataset):

@@ -210,7 +210,7 @@ def fit(
                 history, metrics, epoch + 1, avg_loss, avg_val_loss, elapsed_time
             )
 
-    del data_loader, y_pred, loss, x, y_batch
+    del (data_loader, y_pred, loss, x, y_batch)
     torch.cuda.empty_cache()
 
     return meter, history

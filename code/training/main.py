@@ -139,8 +139,10 @@ def k_fold(config, log_folder=None):
     print("Creating in-memory dataset ...")
 
     start_time = time.time()
-    df_rle = pd.read_csv(f"../input/train_{config.reduce_factor}.csv")
-    train_img_names = df_rle.id.unique()
+    df_rle = pd.read_csv(f"../input/train_{config.reduce_factor}_fc.csv")
+    df_rle_test = pd.read_csv(config.pl_path)
+
+    train_img_names = df_rle.id.unique()  # [::-1]
 
     in_mem_dataset = InMemoryTrainDataset(
         train_img_names,
@@ -155,6 +157,9 @@ def k_fold(config, log_folder=None):
         sampling_mode=config.sampling_mode,
         use_external=config.use_external,
         oof_folder=config.oof_folder,
+        df_rle_test=df_rle_test,
+        test_path="../input/test/",
+        use_pl=config.use_pl,
     )
     print(f"Done in {time.time() - start_time :.0f} seconds.")
 
@@ -174,7 +179,8 @@ def k_fold(config, log_folder=None):
         if log_folder is None or len(config.selected_folds) == 1:
             return meter
 
-        del meter, model
+        del meter
+        del model
         torch.cuda.empty_cache()
         gc.collect()
 
