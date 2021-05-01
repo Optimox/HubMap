@@ -139,8 +139,10 @@ def k_fold(config, log_folder=None):
     print("Creating in-memory dataset ...")
 
     start_time = time.time()
-    df_rle = pd.read_csv(f"../input/train_{config.reduce_factor}_fc.csv")
-    df_rle_test = pd.read_csv(config.pl_path)
+    df_rle = pd.read_csv(config.rle_path)
+    df_rle_test = pd.read_csv(config.pl_path) if config.pl_path is not None else None
+
+    df_rle_extra = pd.read_csv(config.extra_path) if config.extra_path is not None else None
 
     train_img_names = df_rle.id.unique()  # [::-1]
 
@@ -155,11 +157,12 @@ def k_fold(config, log_folder=None):
         iter_per_epoch=config.iter_per_epoch,
         on_spot_sampling=config.on_spot_sampling,
         sampling_mode=config.sampling_mode,
-        use_external=config.use_external,
         oof_folder=config.oof_folder,
         df_rle_test=df_rle_test,
-        test_path="../input/test/",
         use_pl=config.use_pl,
+        test_path="../input/test/",
+        df_rle_extra=df_rle_extra,
+        use_external=config.use_external,
     )
     print(f"Done in {time.time() - start_time :.0f} seconds.")
 

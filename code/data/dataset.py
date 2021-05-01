@@ -8,9 +8,8 @@ import tifffile as tiff
 from pathlib import Path
 from torch.utils.data import Dataset
 
-from params import DATA_PATH, LAB_STATS  # noqa
+from params import DATA_PATH, DATA_PATH_EXTRA
 from utils.rle import enc2mask
-from data.transforms import lab_normalization  # noqa
 from skimage.morphology import convex_hull_image
 
 
@@ -186,6 +185,7 @@ class InMemoryTrainDataset(Dataset):
         oof_folder=None,
         df_rle_test=None,
         test_path="../input/test/",
+        df_rle_extra=None,
         use_pl=0,
     ):
         """"""
@@ -193,8 +193,8 @@ class InMemoryTrainDataset(Dataset):
         self.ext_img_path = "../input/external_data/images_1024/"
         self.ext_msk_path = "../input/external_data/masks_1024/"
         self.external_names = [p.name for p in Path(self.ext_img_path).glob("*")]
-        self.use_external = use_external
-        self.use_pl = use_pl
+        self.use_external = use_external if df_rle_extra is not None else 0
+        self.use_pl = use_pl if df_rle_test is not None else 0
 
         self.sampling_mode = sampling_mode
         assert self.sampling_mode in ["centered", "convhull", "random", "visible"]
@@ -287,6 +287,43 @@ class InMemoryTrainDataset(Dataset):
 
         self.sampling_probs_test = np.array([np.sum(mask) for mask in self.masks_test])
         self.sampling_probs_test = self.sampling_probs_test / np.sum(self.sampling_probs_test)
+
+        # Extra data
+        self.imgs_extra = []
+        self.image_sizes_extra = []
+        self.masks_extra = []
+        self.conv_hulls_extra = []
+
+        if df_rle_extra is not None:
+            for img_name in df_rle_extra.id.values:
+                img = tiff.imread(DATA_PATH_EXTRA + img_name + ".tiff").squeeze()
+                orig_img_size = img.shape
+
+                rle = df_rle_extra.loc[df_rle_extra.id == img_name, "encoding"]
+                mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
+
+                if reduce_factor > 2:
+                    img = cv2.resize(
+                        img,
+                        (img.shape[1] // reduce_factor * 2, img.shape[0] // reduce_factor * 2),
+                        interpolation=cv2.INTER_AREA,
+                    )
+                    mask = cv2.resize(
+                        mask,
+                        (mask.shape[1] // reduce_factor * 2, mask.shape[0] // reduce_factor * 2),
+                        interpolation=cv2.INTER_NEAREST,
+                    )
+
+                self.imgs_extra.append(img)
+                self.image_sizes_extra.append(img.shape)
+                self.masks_extra.append(mask)
+
+                if self.sampling_mode == "convhull":
+                    conv_hull = convex_hull_image(mask)
+                    self.conv_hulls_extra.append(conv_hull)
+
+        self.sampling_probs_extra = np.array([np.sum(mask) for mask in self.masks_extra])
+        self.sampling_probs_extra = self.sampling_probs_extra / np.sum(self.sampling_probs_extra)
 
     def train(self, is_train):
         # Switch to train mode
@@ -424,6 +461,41 @@ class InMemoryTrainDataset(Dataset):
 
         return img, mask, oof_pred
 
+    def getitem_extra(self):
+        image_nb = np.random.choice(
+            range(len(self.imgs_extra)), replace=True, p=self.sampling_probs_extra
+        )
+
+        img_dim = self.image_sizes_extra[image_nb]
+        is_point_ok = False
+        while not is_point_ok:
+            # Sample random point
+            x1 = np.random.randint(img_dim[0] - self.before_crop_size)
+            x2 = x1 + self.before_crop_size
+
+            y1 = np.random.randint(img_dim[1] - self.before_crop_size)
+            y2 = y1 + self.before_crop_size
+
+            is_point_ok = self.accept_tile_policy(
+                image_nb, x1, x2, y1, y2, self.masks_extra, self.conv_hulls_extra
+            )
+
+        img = self.imgs_extra[image_nb][x1:x2, y1:y2]
+        mask = self.masks_extra[image_nb][x1:x2, y1:y2]
+
+        if self.transforms:
+            augmented = self.transforms(image=img, mask=mask)
+            img = augmented["image"]
+            mask = augmented["mask"]
+
+        if self.oof_preds is not None:  # not actually available
+            mask = mask.float()
+            oof_pred = mask.clone()
+        else:
+            oof_pred = 0
+
+        return img, mask, oof_pred
+
     def getitem_normal(self, image_nb):
         img_dim = self.image_sizes[image_nb]
         is_point_ok = False
@@ -465,7 +537,8 @@ class InMemoryTrainDataset(Dataset):
             image_nb = self.used_img_idx[idx % len(self.used_img_idx)]
         else:
             if np.random.rand() < self.use_external:
-                return self.get_external_item()
+                # return self.get_external_item()
+                return self.getitem_extra()
 
             if np.random.rand() < self.use_pl:
                 return self.getitem_pl()
