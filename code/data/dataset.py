@@ -253,6 +253,9 @@ class InMemoryTrainDataset(Dataset):
                                         "VAN0003-LK-32-21-PAS_registered.ome",
                                         ] 
         )
+        self.extra_df = pd.read_csv('../input/external_data/theos_tiff/train_extra.csv')
+        self.new_ext_names = self.extra_df['Unnamed: 0'].unique()
+
         if self.use_pseudo_label is not None:
             self.load_pseudo_images()
 
@@ -311,6 +314,10 @@ class InMemoryTrainDataset(Dataset):
     def load_pseudo_images(self):
         self.pseudo_images = []
         self.pseudo_img_sizes = []
+
+        # self.ext_images = []
+        # self.ext_images_sizes = []
+        self.ext_masks = []
         for pseudo_name in self.pseudo_images_names:
             img_path = glob.glob(f'../input/test/{pseudo_name}.tiff')[0]
             img = simple_load(img_path)
@@ -323,6 +330,29 @@ class InMemoryTrainDataset(Dataset):
             self.pseudo_images.append(img)
             self.pseudo_img_sizes.append(img.shape)
 
+        for ext_name in self.new_ext_names:
+            img_path = glob.glob(f'../input/external_data/theos_tiff/{ext_name}.tiff')[0]
+            img = simple_load(img_path)
+            h, w, _ = img.shape
+            # different interpolate since already downsized
+            img = cv2.resize(
+                             img,
+                             (2*w // self.reduce_factor, 2*h // self.reduce_factor),
+                             interpolation=cv2.INTER_AREA,
+                             )
+
+            rle = self.extra_df.loc[self.extra_df['Unnamed: 0'] == ext_name, "encoding"]
+            mask = enc2mask(rle, (w, h))
+
+            mask = cv2.resize(
+                             img,
+                             (2*w // self.reduce_factor, 2*h // self.reduce_factor),
+                             interpolation=cv2.INTER_NEAREST,
+                             )
+
+            self.pseudo_images.append(img)
+            self.ext_masks.append(mask)
+            self.pseudo_img_sizes.append(img.shape)
 
     def load_pseudo_masks(self, fold_nb, soft_labels):
         self.pseudo_masks = []
@@ -340,6 +370,8 @@ class InMemoryTrainDataset(Dataset):
                 raise NotImplementedError
                 # mask = mask > 0.4
             self.pseudo_masks.append(mask)
+        # add ext masks
+        self.pseudo_masks.extend(self.ext_masks)
         return
 
     def update_fold_nb(self, fold_nb):
