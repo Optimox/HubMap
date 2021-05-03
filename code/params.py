@@ -6,6 +6,7 @@ NUM_WORKERS = 2
 DATA_PATH = "../input/"
 TIFF_PATH = DATA_PATH + "train/"
 TIFF_PATH_4 = DATA_PATH + "train_4/"
+TIFF_PATH_2 = DATA_PATH + "train_2/"
 TIFF_PATH_TEST = DATA_PATH + "test/"
 
 LOG_PATH = "../logs/"
