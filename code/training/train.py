@@ -31,6 +31,7 @@ def fit(
     loss_oof_weight=0,
     verbose=1,
     first_epoch_eval=0,
+    num_classes=1,
     device="cuda",
     use_fp16=False,
 ):
@@ -73,6 +74,7 @@ def fit(
         optimizer = SWA(optimizer)
 
     loss_fct = define_loss(loss_name, device=device)
+    w_fc = 0.2
 
     data_loader = DataLoader(
         dataset,
@@ -106,6 +108,7 @@ def fit(
             x = batch[0].to(device).float()
             y_batch = batch[1].float()
             y_oof = batch[2].float()
+            w = batch[3].float().cuda()
 
             if np.random.random() > mix_proba:
                 x, y_batch = cutmix_data(x, y_batch, alpha=mix_alpha, device=device)
@@ -114,9 +117,22 @@ def fit(
                 with torch.cuda.amp.autocast():
                     y_pred = model(x)
 
+                    if num_classes == 2:
+                        y_batch, y_batch_fc = y_batch[:, :, :, 0], y_batch[:, :, :, 1]
+                        y_pred, y_pred_fc = y_pred[:, 0], y_pred[:, 1]
+
+                        y_pred_fc, y_batch_fc = prepare_for_loss(
+                            y_pred_fc, y_batch_fc, loss_name, device=device
+                        )
+
                     y_pred, y_batch = prepare_for_loss(y_pred, y_batch, loss_name, device=device)
 
                     loss = loss_fct(y_pred, y_batch).mean()
+                    if num_classes == 2:
+                        loss_fc = loss_fct(y_pred_fc, y_batch_fc).mean(-1).mean(-1) * w
+                        loss_fc = loss_fc.sum() / (w.sum() + 1e-6)
+
+                        loss = (loss + w_fc * loss_fc) / (1 + w_fc)
 
                     if loss_oof_weight > 0:
                         y_oof = y_oof.to(device)
@@ -130,6 +146,9 @@ def fit(
                     scaler.step(optimizer)
                     scaler.update()
             else:
+                if num_classes == 2:
+                    raise NotImplementedError
+
                 y_pred = model(x)
 
                 y_pred, y_batch = prepare_for_loss(y_pred, y_batch, loss_name, device=device)
@@ -166,6 +185,10 @@ def fit(
                     y_oof = batch[2].float()
 
                     y_pred = model(x)
+
+                    if num_classes == 2:  # only non-fc
+                        y_batch = y_batch[:, :, :, 0]
+                        y_pred = y_pred[:, 0]
 
                     y_pred, y_batch = prepare_for_loss(
                         y_pred,

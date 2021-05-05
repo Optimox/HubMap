@@ -72,6 +72,7 @@ def train(config, dataset, fold, log_folder=None):
         first_epoch_eval=config.first_epoch_eval,
         device=config.device,
         use_fp16=config.use_fp16,
+        num_classes=config.num_classes,
     )
 
     if config.save_weights and log_folder is not None:
@@ -139,12 +140,18 @@ def k_fold(config, log_folder=None):
     print("Creating in-memory dataset ...")
 
     start_time = time.time()
-    df_rle = pd.read_csv(config.rle_path)
-    df_rle_test = pd.read_csv(config.pl_path) if config.pl_path is not None else None
 
-    df_rle_extra = pd.read_csv(config.extra_path) if config.extra_path is not None else None
+    if isinstance(config.rle_path, list):
+        df_rle = [pd.read_csv(path) for path in config.rle_path]
+        train_img_names = df_rle[0].id.unique()
+    else:
+        df_rle = pd.read_csv(config.rle_path)
+        train_img_names = df_rle.id.unique()
 
-    train_img_names = df_rle.id.unique()  # [::-1]
+    if isinstance(config.extra_path, list):
+        df_rle_extra = [pd.read_csv(path) for path in config.extra_path]
+    else:
+        df_rle_extra = pd.read_csv(config.extra_path)
 
     in_mem_dataset = InMemoryTrainDataset(
         train_img_names,
@@ -158,9 +165,9 @@ def k_fold(config, log_folder=None):
         on_spot_sampling=config.on_spot_sampling,
         sampling_mode=config.sampling_mode,
         oof_folder=config.oof_folder,
-        df_rle_test=df_rle_test,
+        pl_path=config.pl_path,
         use_pl=config.use_pl,
-        test_path="../input/test/",
+        test_path=f"../input/test_{config.reduce_factor}/",
         df_rle_extra=df_rle_extra,
         use_external=config.use_external,
     )

@@ -73,11 +73,16 @@ def predict_entire_mask_downscaled(dataset, model, batch_size=32, tta=False):
             img = img.to("cuda")
             _, _, h, w = img.shape
 
-            pred = model(img).view(-1, h, w).sigmoid().detach()
+            if model.num_classes == 2:
+                pred = model(img)[:, 0].view(-1, h, w).sigmoid().detach()
+            else:
+                pred = model(img).view(-1, h, w).sigmoid().detach()
 
             if tta:
                 for f in FLIPS:
                     pred_flip = model(torch.flip(img, f))
+                    if model.num_classes == 2:
+                        pred_flip = pred_flip[:, 0]
                     pred_flip = torch.flip(pred_flip, f).view(-1, h, w).sigmoid().detach()
                     pred += pred_flip
                 pred = torch.div(pred, len(FLIPS) + 1)
@@ -116,11 +121,17 @@ def predict_entire_mask(dataset, model, batch_size=32, tta=False):
             img = img.to("cuda")
             _, _, h, w = img.shape
 
-            pred = model(img).view(-1, 1, h, w).sigmoid().detach()
+            if model.num_classes == 2:
+                pred = model(img)[:, 0].view(-1, 1, h, w).sigmoid().detach()
+            else:
+                pred = model(img).view(-1, 1, h, w).sigmoid().detach()
 
             if tta:
                 for f in FLIPS:
                     pred_flip = model(torch.flip(img, f))
+                    if model.num_classes == 2:
+                        pred_flip = pred_flip[:, 0]
+
                     pred_flip = torch.flip(pred_flip, f).view(-1, 1, h, w).sigmoid().detach()
                     pred += pred_flip
                 pred = torch.div(pred, len(FLIPS) + 1)

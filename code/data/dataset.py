@@ -183,7 +183,7 @@ class InMemoryTrainDataset(Dataset):
         sampling_mode="convhull",
         use_external=0,
         oof_folder=None,
-        df_rle_test=None,
+        pl_path=None,
         test_path="../input/test/",
         df_rle_extra=None,
         use_pl=0,
@@ -194,7 +194,7 @@ class InMemoryTrainDataset(Dataset):
         self.ext_msk_path = "../input/external_data/masks_1024/"
         self.external_names = [p.name for p in Path(self.ext_img_path).glob("*")]
         self.use_external = use_external if df_rle_extra is not None else 0
-        self.use_pl = use_pl if df_rle_test is not None else 0
+        self.use_pl = use_pl if test_path is not None else 0
 
         self.sampling_mode = sampling_mode
         assert self.sampling_mode in ["centered", "convhull", "random", "visible"]
@@ -223,8 +223,17 @@ class InMemoryTrainDataset(Dataset):
             orig_img_size = img.shape
             img_size = img.shape
 
-            rle = df_rle.loc[df_rle.id == img_name, "encoding"]
-            mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
+            if isinstance(df_rle, list):  # 2 = fc, 1 = not fc
+                rle = df_rle[0].loc[df_rle[0].id == img_name, "encoding"]
+                mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
+                rle = df_rle[1].loc[df_rle[1].id == img_name, "encoding"]
+                mask += 2 * enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
+                mask = np.clip(mask, 0, 2)
+                self.num_classes = 2
+            else:
+                rle = df_rle.loc[df_rle.id == img_name, "encoding"]
+                mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
+                self.num_classes = 1
 
             if self.sampling_mode == "convhull":
                 conv_hull = convex_hull_image(mask)
@@ -234,10 +243,6 @@ class InMemoryTrainDataset(Dataset):
             self.masks.append(mask)
 
         self.images_areas = [h * w for (h, w, c) in self.image_sizes]
-
-        # Deal with fold inside this to avoid reloading for each fold (time consuming)
-        self.update_fold_nb(self.fold_nb)
-        self.train(True)
 
         # Load in memory all oof preds. Expects them to be of the same reduce factor for now
         if oof_folder is not None:
@@ -256,37 +261,14 @@ class InMemoryTrainDataset(Dataset):
         self.imgs_test = []
         self.image_sizes_test = []
         self.masks_test = []
-        self.conv_hulls_test = []
+        self.pl_path = pl_path
+        if pl_path is not None:
+            self.img_names_test = [p[:-5] for p in os.listdir(test_path)]  # hardcoded
 
-        if df_rle_test is not None:
-            for img_name in df_rle_test.id.values:
+            for img_name in self.img_names_test:
                 img = simple_load(os.path.join(test_path, img_name + ".tiff"))
-                orig_img_size = img.shape
-
-                rle = df_rle_test.loc[df_rle_test.id == img_name, "predicted"]
-                mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
-
-                img = cv2.resize(
-                    img,
-                    (img.shape[1] // reduce_factor, img.shape[0] // reduce_factor),
-                    interpolation=cv2.INTER_AREA,
-                )
-                mask = cv2.resize(
-                    mask,
-                    (mask.shape[1] // reduce_factor, mask.shape[0] // reduce_factor),
-                    interpolation=cv2.INTER_NEAREST,
-                )
-
                 self.imgs_test.append(img)
                 self.image_sizes_test.append(img.shape)
-                self.masks_test.append(mask)
-
-                if self.sampling_mode == "convhull":
-                    conv_hull = convex_hull_image(mask)
-                    self.conv_hulls_test.append(conv_hull)
-
-        self.sampling_probs_test = np.array([np.sum(mask) for mask in self.masks_test])
-        self.sampling_probs_test = self.sampling_probs_test / np.sum(self.sampling_probs_test)
 
         # Extra data
         self.imgs_extra = []
@@ -295,12 +277,20 @@ class InMemoryTrainDataset(Dataset):
         self.conv_hulls_extra = []
 
         if df_rle_extra is not None:
-            for img_name in df_rle_extra.id.values:
+            df_extra_ph = df_rle_extra[0] if isinstance(df_rle_extra, list) else df_rle_extra[0]
+            for img_name in df_extra_ph.id.values:
                 img = tiff.imread(DATA_PATH_EXTRA + img_name + ".tiff").squeeze()
                 orig_img_size = img.shape
 
-                rle = df_rle_extra.loc[df_rle_extra.id == img_name, "encoding"]
-                mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
+                if isinstance(df_rle_extra, list):  # 2 = fc, 1 = not fc
+                    rle = df_rle_extra[0].loc[df_rle_extra[0].id == img_name, "encoding"]
+                    mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
+                    rle = df_rle_extra[1].loc[df_rle_extra[1].id == img_name, "encoding"]
+                    mask += 2 * enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
+                    mask = np.clip(mask, 0, 2)
+                else:
+                    rle = df_rle_extra.loc[df_rle_extra.id == img_name, "encoding"]
+                    mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
 
                 if reduce_factor > 2:
                     img = cv2.resize(
@@ -322,8 +312,12 @@ class InMemoryTrainDataset(Dataset):
                     conv_hull = convex_hull_image(mask)
                     self.conv_hulls_extra.append(conv_hull)
 
-        self.sampling_probs_extra = np.array([np.sum(mask) for mask in self.masks_extra])
+        self.sampling_probs_extra = np.array([np.sum(mask == 1) for mask in self.masks_extra])
         self.sampling_probs_extra = self.sampling_probs_extra / np.sum(self.sampling_probs_extra)
+
+        # Deal with fold inside this to avoid reloading for each fold (time consuming)
+        self.update_fold_nb(self.fold_nb, load=False)
+        self.train(True)
 
     def train(self, is_train):
         # Switch to train mode
@@ -333,7 +327,7 @@ class InMemoryTrainDataset(Dataset):
             self.sampling_thresh = self.on_spot_sampling
             self.sampling_probs = np.array(
                 [
-                    np.sum(self.masks[idx])
+                    np.sum(self.masks[idx] == 1)
                     for idx, area in enumerate(self.masks)
                     if idx in self.used_img_idx
                 ]
@@ -345,11 +339,12 @@ class InMemoryTrainDataset(Dataset):
             self.transforms = self.valid_transfo
             self.sampling_thresh = 0
 
-    def update_fold_nb(self, fold_nb):
+    def update_fold_nb(self, fold_nb, load=True):
         """
         Allows switching fold without reloading everything
         """
         # 5 fold cv hard coded
+        self.fold_nb = fold_nb
         self.train_img_idx = [
             tile_nb
             for tile_nb in range(len(self.train_img_names))
@@ -363,15 +358,37 @@ class InMemoryTrainDataset(Dataset):
         self.train_set = [self.train_img_names[idx] for idx in self.train_img_idx]
         self.valid_set = [self.train_img_names[idx] for idx in self.valid_img_idx]
 
+        if self.pl_path is not None and load:
+            self.masks_test = [
+                np.load(self.pl_path + f"pred_{name}_{fold_nb}.npy") for name in self.img_names_test
+            ]
+            self.sampling_probs_test = np.array([np.sum(mask > 0.5) for mask in self.masks_test])
+            self.sampling_probs_test = self.sampling_probs_test / np.sum(self.sampling_probs_test)
+
     def __len__(self):
         return self.iter_per_epoch
 
-    def accept_tile_policy(self, image_nb, x1, x2, y1, y2, masks, convhulls):
+    def accept_tile_policy_pl(self, image_nb, x1, x2, y1, y2, masks):
+        if np.max(masks[image_nb][x1 + 50: x2 - 50, y1 + 50: y2 - 50]) > 0.9:
+            return True
+
+        should_keep = np.random.rand()
+        if should_keep < 1e-3:
+            return True
+        else:
+            return False
+
+    def accept_tile_policy(
+        self, image_nb, x1, x2, y1, y2, masks, convhulls, sampling_thresh=None
+    ):
+        sampling_thresh = self.sampling_thresh if sampling_thresh is None else sampling_thresh
         if self.sampling_thresh == 0:
             return True
 
         if self.sampling_mode == "centered":
-            if masks[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
+            mid_x = int((x1 + x2) / 2)
+            mid_y = int((y1 + y2) / 2)
+            if masks[image_nb][mid_x - 10: mid_x + 10, mid_y - 10: mid_y + 10].max() > 0:
                 return True
         elif self.sampling_mode == "convhull":
             if convhulls[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
@@ -383,48 +400,22 @@ class InMemoryTrainDataset(Dataset):
             return True
 
         should_keep = np.random.rand()
-        if should_keep > self.sampling_thresh:
+        if should_keep > sampling_thresh:
             return True
         else:
             return False
 
-    def get_external_item(self):
-        """
-        Randomly selects an external image
-        """
-        img_name = np.random.choice(self.external_names)
-        img = cv2.cvtColor(
-            cv2.imread(os.path.join(self.ext_img_path, img_name)), cv2.COLOR_BGR2RGB
-        )
+    def accept_tile_policy_ext(
+        self, image_nb, x1, x2, y1, y2, masks
+    ):
+        if np.max(masks[image_nb][x1 + 50: x2 - 50, y1 + 50: y2 - 50]) >= 1:
+            return True
 
-        mask = cv2.imread(
-            os.path.join(self.ext_msk_path, img_name), cv2.IMREAD_GRAYSCALE
-        )
-
-        h, w, _ = img.shape
-        img = cv2.resize(
-            img,
-            (h // self.reduce_factor, w // self.reduce_factor),
-            interpolation=cv2.INTER_AREA,
-        )
-        mask = cv2.resize(
-            mask,
-            (h // self.reduce_factor, w // self.reduce_factor),
-            interpolation=cv2.INTER_NEAREST,
-        )
-
-        if self.transforms:
-            augmented = self.transforms(image=img, mask=mask)
-            img = augmented["image"]
-            mask = augmented["mask"]
-
-        if self.oof_preds is not None:  # not actually available
-            mask = mask.float()
-            oof_pred = mask.clone()
+        should_keep = np.random.rand()
+        if should_keep < 1e-3:
+            return True
         else:
-            oof_pred = 0
-
-        return img, mask, oof_pred
+            return False
 
     def getitem_pl(self):
         image_nb = np.random.choice(
@@ -441,12 +432,15 @@ class InMemoryTrainDataset(Dataset):
             y1 = np.random.randint(img_dim[1] - self.before_crop_size)
             y2 = y1 + self.before_crop_size
 
-            is_point_ok = self.accept_tile_policy(
-                image_nb, x1, x2, y1, y2, self.masks_test, self.conv_hulls_test
+            is_point_ok = self.accept_tile_policy_pl(
+                image_nb, x1, x2, y1, y2, self.masks_test,
             )
 
         img = self.imgs_test[image_nb][x1:x2, y1:y2]
         mask = self.masks_test[image_nb][x1:x2, y1:y2]
+
+        if self.num_classes == 2:
+            mask = np.array([mask, mask]).transpose(1, 2, 0).astype(np.float32)
 
         if self.transforms:
             augmented = self.transforms(image=img, mask=mask)
@@ -459,7 +453,7 @@ class InMemoryTrainDataset(Dataset):
         else:
             oof_pred = 0
 
-        return img, mask, oof_pred
+        return img, mask.float(), oof_pred, 0
 
     def getitem_extra(self):
         image_nb = np.random.choice(
@@ -476,12 +470,19 @@ class InMemoryTrainDataset(Dataset):
             y1 = np.random.randint(img_dim[1] - self.before_crop_size)
             y2 = y1 + self.before_crop_size
 
-            is_point_ok = self.accept_tile_policy(
-                image_nb, x1, x2, y1, y2, self.masks_extra, self.conv_hulls_extra
+            is_point_ok = self.accept_tile_policy_ext(
+                image_nb, x1, x2, y1, y2, self.masks_extra,
             )
 
         img = self.imgs_extra[image_nb][x1:x2, y1:y2]
         mask = self.masks_extra[image_nb][x1:x2, y1:y2]
+
+        if self.num_classes == 2:
+            mask = np.array([mask == 1, mask == 2]).transpose(1, 2, 0).astype(np.uint8)
+
+        if self.oof_preds is not None:
+            if self.num_classes == 2:
+                raise NotImplementedError
 
         if self.transforms:
             augmented = self.transforms(image=img, mask=mask)
@@ -494,7 +495,7 @@ class InMemoryTrainDataset(Dataset):
         else:
             oof_pred = 0
 
-        return img, mask, oof_pred
+        return img, mask.float(), oof_pred, 1
 
     def getitem_normal(self, image_nb):
         img_dim = self.image_sizes[image_nb]
@@ -515,7 +516,12 @@ class InMemoryTrainDataset(Dataset):
         img = self.imgs[image_nb][x1:x2, y1:y2]
         mask = self.masks[image_nb][x1:x2, y1:y2]
 
+        if self.num_classes == 2:
+            mask = np.array([mask == 1, mask == 2]).transpose(1, 2, 0).astype(np.uint8)
+
         if self.oof_preds is not None:
+            if self.num_classes == 2:
+                raise NotImplementedError
             oof_pred = self.oof_preds[image_nb][x1:x2, y1:y2].astype(np.float32)
             mask = np.array([mask, oof_pred]).transpose(1, 2, 0)
 
@@ -529,7 +535,7 @@ class InMemoryTrainDataset(Dataset):
         else:
             oof_pred = 0
 
-        return img, mask, oof_pred
+        return img, mask.float(), oof_pred, 1
 
     def __getitem__(self, idx):
 
@@ -537,7 +543,6 @@ class InMemoryTrainDataset(Dataset):
             image_nb = self.used_img_idx[idx % len(self.used_img_idx)]
         else:
             if np.random.rand() < self.use_external:
-                # return self.get_external_item()
                 return self.getitem_extra()
 
             if np.random.rand() < self.use_pl:

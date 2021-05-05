@@ -41,7 +41,6 @@ def define_model(
     Returns:
         torch model -- Pretrained model.
     """
-
     assert decoder_name in DECODERS, "Decoder name not supported"
     assert encoder_name in ENCODERS, "Encoder name not supported"
 
@@ -53,6 +52,7 @@ def define_model(
         classes=num_classes,
         activation=activation,
     )
+    model.num_classes = num_classes
 
     if use_bot or use_fpn:
         pos_size = int(8 * (input_size / 256))
