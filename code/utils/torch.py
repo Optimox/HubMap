@@ -11,7 +11,6 @@ def seed_everything(seed):
     Args:
         seed (int): Number of the seed.
     """
-
     random.seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
     np.random.seed(seed)
@@ -81,11 +80,11 @@ def count_parameters(model, all=False):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-def get_n_params(model):
-    pp = 0
-    for p in list(model.parameters()):
-        nn = 1
-        for s in list(p.size()):
-            nn = nn * s
-        pp += nn
-    return pp
+def worker_init_fn(worker_id):
+    """
+    Handles PyTorch x Numpy seeding issues.
+
+    Args:
+        worker_id (int]): Id of the worker.
+    """
+    np.random.seed(np.random.get_state()[1][0] + worker_id)

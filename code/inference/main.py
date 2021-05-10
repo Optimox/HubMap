@@ -6,12 +6,13 @@ from training.predict import (
     predict_entire_mask_downscaled,
     predict_entire_mask,
     threshold_resize_torch,
+    predict_entire_mask_downscaled_tta
 )
 
 from model_zoo.models import define_model
 
 from data.dataset import InferenceDataset
-from data.transforms import HE_preprocess
+from data.transforms import HE_preprocess_test
 
 from utils.rle import enc2mask
 from utils.torch import load_model_weights
@@ -28,8 +29,24 @@ def validate_inf(
     use_full_size=True,
     global_threshold=None,
     use_tta=False,
-    save=False
+    save=False,
+    save_all_tta=False,
 ):
+    """
+    Performs inference with a model on a list of train images.
+
+    Args:
+        model (torch model): Segmentation model.
+        config (Config): Parameters.
+        val_images (list of strings): Image names.
+        fold (int, optional): Fold index. Defaults to 0.
+        log_folder (str or None, optional): Folder to save predictions to. Defaults to None.
+        use_full_size (bool, optional): Whether to use full resolution images. Defaults to True.
+        global_threshold (float, optional): Threshold for probabilities. Defaults to None.
+        use_tta (bool, optional): Whether to use tta. Defaults to False.
+        save (bool, optional): Whether to save predictions. Defaults to False.
+        save_all_tta (bool, optional): Whether to save predictions for all tta. Defaults to False.
+    """
     df_info = pd.read_csv(DATA_PATH + "HuBMAP-20-dataset_information.csv")
 
     if use_full_size:
@@ -55,26 +72,39 @@ def validate_inf(
             overlap_factor=config.overlap_factor,
             reduce_factor=reduce_factor,
             tile_size=config.tile_size,
-            transforms=HE_preprocess(augment=False, visualize=False, size=config.tile_size),
+            transforms=HE_preprocess_test(augment=False, visualize=False),
         )
 
-        if use_full_size:
-            global_pred = predict_entire_mask(
-                predict_dataset, model, batch_size=config.val_bs, tta=use_tta
+        if save_all_tta:
+            global_pred = predict_entire_mask_downscaled_tta(
+                predict_dataset, model, batch_size=config.val_bs
             )
-            threshold, score = 0.4, 0
+            np.save(
+                log_folder + f"pred_{img}.npy",
+                global_pred.cpu().numpy()
+            )
+
+            global_pred = global_pred.mean(0)
 
         else:
-            global_pred = predict_entire_mask_downscaled(
-                predict_dataset, model, batch_size=config.val_bs, tta=use_tta
-            )
+            if use_full_size:
+                global_pred = predict_entire_mask(
+                    predict_dataset, model, batch_size=config.val_bs, tta=use_tta
+                )
+                threshold, score = 0.4, 0
 
-            threshold, score = tweak_threshold(
-                mask=torch.from_numpy(predict_dataset.mask).cuda(), pred=global_pred
-            )
-            print(
-                f" - Scored {score :.4f} for downscaled image {img} with threshold {threshold:.2f}"
-            )
+            else:
+                global_pred = predict_entire_mask_downscaled(
+                    predict_dataset, model, batch_size=config.val_bs, tta=use_tta
+                )
+
+                threshold, score = tweak_threshold(
+                    mask=torch.from_numpy(predict_dataset.mask).cuda(), pred=global_pred
+                )
+                print(
+                    f" - Scored {score :.4f} for downscaled"
+                    f"image {img} with threshold {threshold:.2f}"
+                )
 
         shape = df_info[df_info.image_file == img + ".tiff"][
             ["width_pixels", "height_pixels"]
@@ -85,7 +115,7 @@ def validate_inf(
             global_threshold if global_threshold is not None else threshold
         )
 
-        if save:
+        if save and not save_all_tta:
             np.save(
                 log_folder + f"pred_{img}.npy",
                 global_pred.cpu().numpy()
@@ -116,12 +146,19 @@ def k_fold_inf(
     global_threshold=None,
     use_tta=False,
     save=False,
+    save_all_tta=False,
 ):
     """
+    Performs a k-fold inference on the train data.
+
     Args:
         config (Config): Parameters.
-        df (pandas dataframe): Metadata.
-        log_folder (None or str, optional): Folder to logs results to. Defaults to None.
+        df (pandas dataframe): Train metadata. Contains image names and rles.
+        log_folder (None or str, optional): Folder to load the weights from. Defaults to None.
+        use_full_size (bool, optional): Whether to use full resolution images. Defaults to True.
+        global_threshold (float, optional): Threshold for probabilities. Defaults to None.
+        use_tta (bool, optional): Whether to use tta. Defaults to False.
+        save_all_tta (bool, optional): Whether to save predictions for all tta. Defaults to False.
     """
     folds = df[config.cv_column].unique()
     scores = []
@@ -138,10 +175,6 @@ def k_fold_inf(
                 config.encoder,
                 num_classes=config.num_classes,
                 encoder_weights=config.encoder_weights,
-                double_model=config.double_model,
-                input_size=config.tile_size,
-                use_bot=config.use_bot,
-                use_fpn=config.use_fpn,
             ).to(config.device)
             model.zero_grad()
             model.eval()
@@ -159,8 +192,7 @@ def k_fold_inf(
                 global_threshold=global_threshold,
                 use_tta=use_tta,
                 save=save,
+                save_all_tta=save_all_tta,
             )
-
-            # break
 
     return scores

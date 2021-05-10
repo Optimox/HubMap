@@ -2,6 +2,16 @@ import numpy as np
 
 
 def enc2mask(encs, shape):
+    """
+    Decodes a rle.
+
+    Args:
+        encs (list of str): Rles for each class.
+        shape (tuple [2]): Mask size.
+
+    Returns:
+        np array [shape]: Mask.
+    """
     img = np.zeros(shape[0] * shape[1], dtype=np.uint8)
     for m, enc in enumerate(encs):
         if isinstance(enc, np.float) and np.isnan(enc):
@@ -15,6 +25,16 @@ def enc2mask(encs, shape):
 
 
 def mask2enc(mask, n=1):
+    """
+    Encodes a mask to rle
+
+    Args:
+        mask (np array [H x W]): Mask
+        n (int, optional): Number fo classes. Defaults to 1.
+
+    Returns:
+        list of strings: Rle encodings.
+    """
     pixels = mask.T.flatten()
     encs = []
     for i in range(1, n + 1):

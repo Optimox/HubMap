@@ -48,3 +48,4 @@ class SegmentationMeter:
         self.metrics = {
             "dice": [0],
         }
+        return self.metrics

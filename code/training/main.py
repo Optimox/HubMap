@@ -17,7 +17,7 @@ from utils.torch import seed_everything, count_parameters, save_model_weights
 
 def train(config, dataset, fold, log_folder=None):
     """
-    Trains and validate a model.
+    Trains a model.
 
     Args:
         config (Config): Parameters.
@@ -28,6 +28,7 @@ def train(config, dataset, fold, log_folder=None):
     Returns:
         SegmentationMeter: Meter.
         pandas dataframe: Training history.
+        torch model: Trained segmentation model.
     """
 
     seed_everything(config.seed)
@@ -37,10 +38,6 @@ def train(config, dataset, fold, log_folder=None):
         config.encoder,
         num_classes=config.num_classes,
         encoder_weights=config.encoder_weights,
-        double_model=config.double_model,
-        input_size=config.tile_size,
-        use_bot=config.use_bot,
-        use_fpn=config.use_fpn,
     ).to(config.device)
     model.zero_grad()
 
@@ -63,11 +60,12 @@ def train(config, dataset, fold, log_folder=None):
         val_bs=config.val_bs,
         lr=config.lr,
         warmup_prop=config.warmup_prop,
-        swa_first_epoch=config.swa_first_epoch,
+        mix_proba=config.mix_proba,
+        mix_alpha=config.mix_alpha,
         verbose=config.verbose,
         first_epoch_eval=config.first_epoch_eval,
         device=config.device,
-        use_fp16=config.use_fp16,
+        num_classes=config.num_classes,
     )
 
     if config.save_weights and log_folder is not None:
@@ -83,7 +81,7 @@ def train(config, dataset, fold, log_folder=None):
 
 def validate(model, config, val_images):
     """
-    Quick model validation on full images.
+    Quick model validation on images.
     Validation is performed on downscaled images.
 
     Args:
@@ -122,8 +120,7 @@ def validate(model, config, val_images):
 
 def k_fold(config, log_folder=None):
     """
-    Performs a patient grouped k-fold cross validation.
-    The following things are saved to the log folder : val predictions, histories
+    Performs a  k-fold cross validation.
 
     Args:
         config (Config): Parameters.
@@ -135,8 +132,18 @@ def k_fold(config, log_folder=None):
     print("Creating in-memory dataset ...")
 
     start_time = time.time()
-    df_rle = pd.read_csv(f"../input/train_{config.reduce_factor}.csv")
-    train_img_names = df_rle.id.unique()
+
+    if isinstance(config.rle_path, list):
+        df_rle = [pd.read_csv(path) for path in config.rle_path]
+        train_img_names = df_rle[0].id.unique()
+    else:
+        df_rle = pd.read_csv(config.rle_path)
+        train_img_names = df_rle.id.unique()
+
+    if isinstance(config.extra_path, list):
+        df_rle_extra = [pd.read_csv(path) for path in config.extra_path]
+    else:
+        df_rle_extra = pd.read_csv(config.extra_path) if config.extra_path is not None else None
 
     in_mem_dataset = InMemoryTrainDataset(
         train_img_names,
@@ -148,7 +155,10 @@ def k_fold(config, log_folder=None):
         train_path=f"../input/train_{config.reduce_factor}/",
         iter_per_epoch=config.iter_per_epoch,
         on_spot_sampling=config.on_spot_sampling,
-        sampling_mode=config.sampling_mode,
+        pl_path=config.pl_path,
+        use_pl=config.use_pl,
+        test_path=f"../input/test_{config.reduce_factor}/",
+        df_rle_extra=df_rle_extra,
         use_external=config.use_external,
     )
     print(f"Done in {time.time() - start_time :.0f} seconds.")
@@ -169,7 +179,8 @@ def k_fold(config, log_folder=None):
         if log_folder is None or len(config.selected_folds) == 1:
             return meter
 
-        del meter, model
+        del meter
+        del model
         torch.cuda.empty_cache()
         gc.collect()
 
