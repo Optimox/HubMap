@@ -17,7 +17,6 @@ LOGGED_IN_CONFIG = [
     "epochs",
     "lr",
     "warmup_prop",
-    "swa_first_epoch",
     "k",
     "random_state",
 ]

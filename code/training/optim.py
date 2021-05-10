@@ -1,45 +1,7 @@
 import torch
-import torch.nn as nn
-
 from training.lovasz import lovasz_loss
 
 LOSSES = ["CrossEntropyLoss", "BCELoss", "BCEWithLogitsLoss"]
-
-
-class SoftDiceLoss(nn.Module):
-    """
-    Soft dice loss.
-    Adapted from https://github.com/CoinCheung/pytorch-loss.
-    """
-    def __init__(self, p=1, smooth=0, eps=1e-6):
-        """
-        Construction
-        Args:
-            p (int, optional): Probabily exponent. Defaults to 1.
-            smooth (int, optional): Smoothing parameter. Defaults to 0.
-            eps (float, optional): Epsilon to avoid dividing by 0. Defaults to 1e-6.
-        """
-        super().__init__()
-        self.p = p
-        self.eps = eps
-        self.smooth = smooth
-
-    def forward(self, logits, labels):
-        """
-        Loss computation.
-
-        Args:
-            logits (torch tensor [BS x C x H x W]): Logits.
-            labels (torch tensor [BS x C x H x W]): Ground truths.
-
-        Returns:
-            torch tensor [BS x C x H x W]: Loss value.
-        """
-        probs = torch.sigmoid(logits)
-        numer = (probs * labels).sum(dim=(-1, -2))
-        denor = (probs.pow(self.p) + labels).sum(dim=(-1, -2))
-        loss = 1. - (2 * numer + self.smooth) / (denor + self.smooth + self.eps)
-        return loss
 
 
 def define_loss(name, device="cuda"):
@@ -61,8 +23,6 @@ def define_loss(name, device="cuda"):
         loss = getattr(torch.nn, name)(reduction="none")
     elif name == "lovasz":
         loss = lovasz_loss
-    elif name == "SoftDiceLoss":
-        loss = SoftDiceLoss()
     else:
         raise NotImplementedError
 

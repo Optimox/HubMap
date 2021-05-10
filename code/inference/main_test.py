@@ -26,6 +26,20 @@ def validate_inf_test(
     use_tta=False,
     save=False
 ):
+    """
+    Performs inference with a model on a list of  test images.
+
+    Args:
+        model (torch model): Segmentation model.
+        config (Config): Parameters.
+        images (list of strings): Image names.
+        fold (int, optional): Fold index. Defaults to 0.
+        log_folder (str or None, optional): Folder to save predictions to. Defaults to None.
+        use_full_size (bool, optional): Whether to use full resolution images. Defaults to True.
+        global_threshold (float, optional): Threshold for probabilities. Defaults to None.
+        use_tta (bool, optional): Whether to use tta. Defaults to False.
+        save (bool, optional): Whether to save predictions. Defaults to False.
+    """
     df_info = pd.read_csv(DATA_PATH + "HuBMAP-20-dataset_information.csv")
 
     if use_full_size:
@@ -88,10 +102,16 @@ def k_fold_inf_test(
     save=False,
 ):
     """
+    Performs a k-fold inference on the test data.
+
     Args:
         config (Config): Parameters.
-        df (pandas dataframe): Metadata.
-        log_folder (None or str, optional): Folder to logs results to. Defaults to None.
+        images (list of strings): Image names.
+        log_folder (None or str, optional): Folder to load the weights from. Defaults to None.
+        use_full_size (bool, optional): Whether to use full resolution images. Defaults to True.
+        global_threshold (float, optional): Threshold for probabilities. Defaults to None.
+        use_tta (bool, optional): Whether to use tta. Defaults to False.
+        save (bool, optional): Whether to save predictions. Defaults to False.
     """
     for fold in range(5):
         if fold in config.selected_folds:
@@ -102,10 +122,6 @@ def k_fold_inf_test(
                 config.encoder,
                 num_classes=config.num_classes,
                 encoder_weights=config.encoder_weights,
-                double_model=config.double_model,
-                input_size=config.tile_size,
-                use_bot=config.use_bot,
-                use_fpn=config.use_fpn,
             ).to(config.device)
             model.zero_grad()
             model.eval()

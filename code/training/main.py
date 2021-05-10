@@ -17,7 +17,7 @@ from utils.torch import seed_everything, count_parameters, save_model_weights
 
 def train(config, dataset, fold, log_folder=None):
     """
-    Trains and validate a model.
+    Trains a model.
 
     Args:
         config (Config): Parameters.
@@ -28,6 +28,7 @@ def train(config, dataset, fold, log_folder=None):
     Returns:
         SegmentationMeter: Meter.
         pandas dataframe: Training history.
+        torch model: Trained segmentation model.
     """
 
     seed_everything(config.seed)
@@ -37,11 +38,6 @@ def train(config, dataset, fold, log_folder=None):
         config.encoder,
         num_classes=config.num_classes,
         encoder_weights=config.encoder_weights,
-        double_model=config.double_model,
-        input_size=config.tile_size,
-        use_bot=config.use_bot,
-        use_fpn=config.use_fpn,
-        use_mixstyle=config.use_mixstyle,
     ).to(config.device)
     model.zero_grad()
 
@@ -64,14 +60,11 @@ def train(config, dataset, fold, log_folder=None):
         val_bs=config.val_bs,
         lr=config.lr,
         warmup_prop=config.warmup_prop,
-        swa_first_epoch=config.swa_first_epoch,
         mix_proba=config.mix_proba,
         mix_alpha=config.mix_alpha,
-        loss_oof_weight=config.loss_oof_weight,
         verbose=config.verbose,
         first_epoch_eval=config.first_epoch_eval,
         device=config.device,
-        use_fp16=config.use_fp16,
         num_classes=config.num_classes,
     )
 
@@ -88,7 +81,7 @@ def train(config, dataset, fold, log_folder=None):
 
 def validate(model, config, val_images):
     """
-    Quick model validation on full images.
+    Quick model validation on images.
     Validation is performed on downscaled images.
 
     Args:
@@ -127,8 +120,7 @@ def validate(model, config, val_images):
 
 def k_fold(config, log_folder=None):
     """
-    Performs a patient grouped k-fold cross validation.
-    The following things are saved to the log folder : val predictions, histories
+    Performs a  k-fold cross validation.
 
     Args:
         config (Config): Parameters.
@@ -163,14 +155,11 @@ def k_fold(config, log_folder=None):
         train_path=f"../input/train_{config.reduce_factor}/",
         iter_per_epoch=config.iter_per_epoch,
         on_spot_sampling=config.on_spot_sampling,
-        sampling_mode=config.sampling_mode,
-        oof_folder=config.oof_folder,
         pl_path=config.pl_path,
         use_pl=config.use_pl,
         test_path=f"../input/test_{config.reduce_factor}/",
         df_rle_extra=df_rle_extra,
         use_external=config.use_external,
-        use_zenodo=config.use_zenodo,
     )
     print(f"Done in {time.time() - start_time :.0f} seconds.")
 

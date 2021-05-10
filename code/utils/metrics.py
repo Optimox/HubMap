@@ -11,7 +11,7 @@ def dice_scores_img(pred, truth, eps=1e-8):
         eps (float, optional): epsilon to avoid dividing by 0. Defaults to 1e-8.
 
     Returns:
-        np array : dice value for each class
+        np array : dice value for each class.
     """
     pred = pred.reshape(-1) > 0
     truth = truth.reshape(-1) > 0
@@ -32,7 +32,7 @@ def dice_scores_img_tensor(pred, truth, eps=1e-8):
         eps (float, optional): epsilon to avoid dividing by 0. Defaults to 1e-8.
 
     Returns:
-        np array : dice value for each class
+        np array : dice value for each class.
     """
     pred = pred.view(-1) > 0
     truth = truth.contiguous().view(-1) > 0
@@ -54,7 +54,7 @@ def dice_score(pred, truth, eps=1e-8, threshold=0.5):
         threshold (float, optional): Threshold for predictions. Defaults to 0.5.
 
     Returns:
-        float: dice value
+        float: dice value.
     """
     pred = (pred.reshape((truth.shape[0], -1)) > threshold).astype(int)
     truth = truth.reshape((truth.shape[0], -1)).astype(int)
@@ -75,7 +75,7 @@ def dice_score_tensor(pred, truth, eps=1e-8, threshold=0.5):
         threshold (float, optional): Threshold for predictions. Defaults to 0.5.
 
     Returns:
-        float: dice value
+        float: dice value.
     """
     pred = (pred.view((truth.size(0), -1)) > threshold).int()
     truth = truth.view((truth.size(0), -1)).int()
@@ -86,6 +86,17 @@ def dice_score_tensor(pred, truth, eps=1e-8, threshold=0.5):
 
 
 def tweak_threshold(mask, pred):
+    """
+    Tweaks the threshold to maximise the score.
+
+    Args:
+        mask (torch tensor): Ground truths.
+        pred (torch tensor): Predictions.
+
+    Returns:
+        float: Best threshold.
+        float: Best score.
+    """
     thresholds = []
     scores = []
     for threshold in np.linspace(0.2, 0.7, 11):

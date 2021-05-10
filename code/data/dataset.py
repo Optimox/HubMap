@@ -1,22 +1,27 @@
 import os
 import cv2
-import json
-import torch
 import numpy as np
 import pandas as pd
 import tifffile as tiff
-from pathlib import Path
 from torch.utils.data import Dataset
 
-from params import DATA_PATH, DATA_PATH_EXTRA, ZENODO_PATH
+from params import DATA_PATH, DATA_PATH_EXTRA
 from utils.rle import enc2mask
-from skimage.morphology import convex_hull_image
 
 
 def load_image(img_path, full_size=True, reduce_factor=4):
     """
-    Load image and make sure sizes matches df_info
+    Loads an image, and makes sure the axis are in the same position as specified in the metadata.
+
+    Args:
+        img_path (str): Path to the image.
+        full_size (bool, optional): Whether the image was downsized. Defaults to True.
+        reduce_factor (int, optional): How much the image was downsized. Defaults to 4.
+
+    Returns:
+        np array [H x W x 3]: Image.
     """
+
     df_info = pd.read_csv(DATA_PATH + "HuBMAP-20-dataset_information.csv")
     image_fname = img_path.rsplit("/", -1)[-1]
 
@@ -45,7 +50,13 @@ def load_image(img_path, full_size=True, reduce_factor=4):
 
 def simple_load(img_path):
     """
-    Load image and make sure channels in last position
+    Loads an image, and makes sure the channel axis is in last position.
+
+    Args:
+        img_path (str): Path to the image.
+
+    Returns:
+        np array [H x W x 3]: Image.
     """
     img = tiff.imread(img_path).squeeze()
     if img.shape[0] == 3:
@@ -54,6 +65,9 @@ def simple_load(img_path):
 
 
 class InferenceDataset(Dataset):
+    """
+    Dataset for inference.
+    """
     def __init__(
         self,
         original_img_path,
@@ -63,10 +77,19 @@ class InferenceDataset(Dataset):
         reduce_factor=4,
         transforms=None,
     ):
+        """
+        Constructor.
+
+        Args:
+            original_img_path (str]): [description]
+            rle (str or None, optional): rle encoding. Defaults to None.
+            overlap_factor (int, optional): Overlap factor. Defaults to 1.
+            tile_size (int, optional): Tile size. Defaults to 256.
+            reduce_factor (int, optional): Reduce factor. Defaults to 4.
+            transforms (albu transforms or None, optional): Transforms. Defaults to None.
+        """
         self.original_img = simple_load(original_img_path)
         self.orig_size = self.original_img.shape
-
-        # self.original_img = lab_normalization(self.original_img)
 
         self.raw_tile_size = tile_size
         self.reduce_factor = reduce_factor
@@ -87,14 +110,20 @@ class InferenceDataset(Dataset):
         return len(self.positions)
 
     def get_positions(self):
+        """
+        Computes positions of the tiles.
+
+        Returns:
+            np array: Tile starting positions.
+        """
         top_x = np.arange(
             0,
-            self.orig_size[0],  # +self.tile_size,
+            self.orig_size[0],
             int(self.tile_size / self.overlap_factor),
         )
         top_y = np.arange(
             0,
-            self.orig_size[1],  # +self.tile_size,
+            self.orig_size[1],
             int(self.tile_size / self.overlap_factor),
         )
         starting_positions = []
@@ -119,9 +148,6 @@ class InferenceDataset(Dataset):
         pos_x, pos_y = self.positions[idx]
         img = self.original_img[pos_x[0]: pos_x[1], pos_y[0]: pos_y[1], :]
 
-        # img = lab_normalization(img)
-
-        # down scale to tile size
         if self.reduce_factor > 1:
             img = cv2.resize(
                 img,
@@ -140,34 +166,11 @@ class InferenceDataset(Dataset):
 class InMemoryTrainDataset(Dataset):
     """
     In Memory Dataset, which allows to smart tile sampling of any size and reduction factor.
-
-    Everything must be loaded into RAM once (takes about 4 minutes).
-
+    Everything must be loaded into RAM once.
     The self.train method allows to easily switch from training/validation mode.
     It changes the image used for tiles and disable transformation.
-
-    The self.update_fold_nb allows to change fold without reloading everything
-
-    Params
-    ------
-        - train_img_names : images to use for CV
-        - df_rle : training pandas df with rle encoded masks
-        - train_tile_size : int, size of images to input model
-        - reduce_factor : reduction factor to apply before entering the model
-        - transforms : albu transfo, augmentation scheme
-        - train_path : path to folder with the original tiff images
-        - iter_per_epoch : int, number of tiles that constitue an epoch
-        - on_sport_samping : float between 0 and 1, probability of rejection outside conv hull
-                             (1. means only intersting tiles, 0 purely random tiles)
-        - fold_nb : which fold are we considereing at the moment (everything is in RAM)
-        - sampling_mode:
-            - centered : center of image should contain glomuleri
-            - convhull : will use conv_hull only
-            - random : any
-            - visible : tile should have at least 2K pixels as glomuleri
-        - use_external : None or float of probability
+    The self.update_fold_nb allows to change fold without reloading everything.
     """
-
     def __init__(
         self,
         train_img_names,
@@ -180,25 +183,35 @@ class InMemoryTrainDataset(Dataset):
         iter_per_epoch=1000,
         on_spot_sampling=0.9,
         fold_nb=0,
-        sampling_mode="convhull",
-        use_external=0,
-        oof_folder=None,
+        use_pl=0,
         pl_path=None,
         test_path="../input/test/",
         df_rle_extra=None,
-        use_pl=0,
-        use_zenodo=0,
+        use_external=0,
     ):
-        """"""
-        # Hard coded external path for now
-        self.ext_img_path = "../input/external_data/images_1024/"
-        self.ext_msk_path = "../input/external_data/masks_1024/"
-        self.external_names = [p.name for p in Path(self.ext_img_path).glob("*")]
+        """
+        Constructor.
+
+        Args:
+            train_img_names (list of str): Training data.
+            df_rle (pandas dataframe): Ground truths as rles.
+            train_tile_size (int, optional): Training tile size. Defaults to 256.
+            reduce_factor (int, optional): Downsizing factor. Defaults to 4.
+            train_transfo (albu transforms, optional): Training augmentations. Defaults to None.
+            valid_transfo (albu transforms, optional): Validation transforms. Defaults to None.
+            train_path (str, optional): Path to the training images. Defaults to "../input/train/".
+            iter_per_epoch (int, optional): Number of images to sample per epoch. Defaults to 1000.
+            on_spot_sampling (float, optional): Proba for the sampling strategy. Defaults to 0.9.
+            fold_nb (int, optional): Fold number. Defaults to 0.
+            use_pl (int, optional): Sampling proportion for pseudo-labeled data. Defaults to 0.
+            pl_path (str or None, optional): Path to pseudo labels. Defaults to None.
+            test_path (str, optional): Path to test images. Defaults to "../input/test/".
+            df_rle_extra (pandas dataframe, optional): Ext ground truths as rles. Defaults to None.
+            use_external (int, optional): Sampling proportion for external data. Defaults to 0.
+        """
         self.use_external = use_external if df_rle_extra is not None else 0
         self.use_pl = use_pl if test_path is not None else 0
 
-        self.sampling_mode = sampling_mode
-        assert self.sampling_mode in ["centered", "convhull", "random", "visible"]
         self.iter_per_epoch = iter_per_epoch
         self.train_tile_size = train_tile_size
         # Allows to make heavier transfo without artefact by center cropping
@@ -218,7 +231,7 @@ class InMemoryTrainDataset(Dataset):
         self.masks = []
         self.conv_hulls = []
 
-        # Load in memory all resized images, masks and conv_hulls
+        # Load in memory all resized images & masks
         for img_name in self.train_img_names:
             img = simple_load(os.path.join(train_path, img_name + ".tiff"))
             orig_img_size = img.shape
@@ -236,27 +249,11 @@ class InMemoryTrainDataset(Dataset):
                 mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
                 self.num_classes = 1
 
-            if self.sampling_mode == "convhull":
-                conv_hull = convex_hull_image(mask)
-                self.conv_hulls.append(conv_hull)
             self.imgs.append(img)
             self.image_sizes.append(img_size)
             self.masks.append(mask)
 
         self.images_areas = [h * w for (h, w, c) in self.image_sizes]
-
-        # Load in memory all oof preds. Expects them to be of the same reduce factor for now
-        if oof_folder is not None:
-            config = json.load(open(oof_folder + "config.json", "r"))
-            assert (
-                config["reduce_factor"] == reduce_factor
-            ), "Different prediction reduce factor"
-
-            self.oof_preds = []
-            for img_name in self.train_img_names:
-                self.oof_preds.append(np.load(oof_folder + f"pred_{img_name}.npy"))
-        else:
-            self.oof_preds = None
 
         # Test data
         self.imgs_test = []
@@ -287,12 +284,11 @@ class InMemoryTrainDataset(Dataset):
                     mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
                     rle = df_rle_extra[1].loc[df_rle_extra[1].id == img_name, "encoding"]
                     mask += 2 * enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
-                    # mask = np.clip(mask, 0, 2)
                 else:
                     rle = df_rle_extra.loc[df_rle_extra.id == img_name, "encoding"]
                     mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
 
-                if reduce_factor > 2:
+                if reduce_factor > 2:  # downsize if necessary
                     img = cv2.resize(
                         img,
                         (img.shape[1] // reduce_factor * 2, img.shape[0] // reduce_factor * 2),
@@ -311,44 +307,18 @@ class InMemoryTrainDataset(Dataset):
         self.sampling_probs_extra = np.array([np.sum(mask == 1) for mask in self.masks_extra])
         self.sampling_probs_extra = self.sampling_probs_extra / np.sum(self.sampling_probs_extra)
 
-        # Zenodo data
-        self.imgs_zenodo = []
-        self.image_sizes_zenodo = []
-        self.masks_zenodo = []
-        self.use_zenodo = use_zenodo
-        if use_zenodo > 0:
-            imgs = [p[:-4] for p in os.listdir(ZENODO_PATH) if p.endswith(".png")]
-
-            for img_name in imgs:
-                img = cv2.imread(ZENODO_PATH + img_name + ".png")
-                mask = np.load(ZENODO_PATH + img_name + "_mask.npy")
-
-                if reduce_factor > 2:
-                    img = cv2.resize(
-                        img,
-                        (img.shape[1] // reduce_factor * 2, img.shape[0] // reduce_factor * 2),
-                        interpolation=cv2.INTER_AREA,
-                    )
-                    mask = cv2.resize(
-                        mask,
-                        (mask.shape[1] // reduce_factor * 2, mask.shape[0] // reduce_factor * 2),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
-
-                self.imgs_zenodo.append(img)
-                self.image_sizes_zenodo.append(img.shape)
-                self.masks_zenodo.append(mask)
-
-        self.sampling_probs_zenodo = np.array([np.sum(mask == 1) for mask in self.masks_zenodo])
-        self.sampling_probs_zenodo = self.sampling_probs_zenodo / np.sum(self.sampling_probs_zenodo)
-
         # Deal with fold inside this to avoid reloading for each fold (time consuming)
         self.update_fold_nb(self.fold_nb, load=False)
         self.train(True)
 
     def train(self, is_train):
-        # Switch to train mode
-        if is_train:
+        """
+        Switches the dataset between train and validation mode.
+
+        Args:
+            is_train (bool): True to switch to train and False to switch to val.
+        """
+        if is_train:  # Switch to train mode
             self.used_img_idx = self.train_img_idx
             self.transforms = self.train_transfo
             self.sampling_thresh = self.on_spot_sampling
@@ -360,15 +330,19 @@ class InMemoryTrainDataset(Dataset):
                 ]
             )
             self.sampling_probs = self.sampling_probs / np.sum(self.sampling_probs)
-        else:
-            # switch tile, disable transformation and on_spot_sampling (should we?)
+        else:  # switch tile, disable transformation and on_spot_sampling (should we?)
             self.used_img_idx = self.valid_img_idx
             self.transforms = self.valid_transfo
             self.sampling_thresh = 0
 
     def update_fold_nb(self, fold_nb, load=True):
         """
-        Allows switching fold without reloading everything
+        Switches the fold. Updates train and val images,
+        Updates pseudo-labels if load is True.
+
+        Args:
+            fold_nb (int): Fold number.
+            load (bool, optional): Whether to load pseudo labels. Defaults to True.
         """
         # 5 fold cv hard coded
         self.fold_nb = fold_nb
@@ -385,6 +359,7 @@ class InMemoryTrainDataset(Dataset):
         self.train_set = [self.train_img_names[idx] for idx in self.train_img_idx]
         self.valid_set = [self.train_img_names[idx] for idx in self.valid_img_idx]
 
+        # Update PL masks
         if self.pl_path is not None and load:
             self.masks_test = [
                 np.load(self.pl_path + f"pred_{name}_{fold_nb}.npy") for name in self.img_names_test
@@ -395,25 +370,29 @@ class InMemoryTrainDataset(Dataset):
     def __len__(self):
         return self.iter_per_epoch
 
-    def accept_tile_policy(
-        self, image_nb, x1, x2, y1, y2, masks, convhulls
-    ):
+    def accept_tile_policy_normal(self, image_nb, x1, x2, y1, y2):
+        """
+        Tile acceptation policy for the training data.
+        We accept images that have a glomeruli at their middle.
+        We allow for exceptions with a probability self.sampling_thresh
+
+        Args:
+            image_nb (int): Image number.
+            x1 (int): Tile coordinate (top left x).
+            x2 (int): Tile coordinate (bottom left x).
+            y1 (int): Tile coordinate (top left y).
+            y2 (int): Tile coordinate (bottom left y).
+
+        Returns:
+            bool: Whether the tile is accepted.
+        """
         if self.sampling_thresh == 0:
             return True
 
-        if self.sampling_mode == "centered":
-            mid_x = int((x1 + x2) / 2)
-            mid_y = int((y1 + y2) / 2)
-            m = 10
-            if masks[image_nb][mid_x - m: mid_x + m, mid_y - m: mid_y + m].max() > 0:
-                return True
-        elif self.sampling_mode == "convhull":
-            if convhulls[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
-                return True
-        elif self.sampling_mode == "visible":
-            if masks[image_nb][x1:x2, y1:y2].sum() > 2000:
-                return True
-        elif self.sampling_mode == "random":
+        mid_x = int((x1 + x2) / 2)
+        mid_y = int((y1 + y2) / 2)
+        m = 10
+        if self.masks[image_nb][mid_x - m: mid_x + m, mid_y - m: mid_y + m].max() > 0:
             return True
 
         should_keep = np.random.rand()
@@ -422,11 +401,26 @@ class InMemoryTrainDataset(Dataset):
         else:
             return False
 
-    def accept_tile_policy_pl(self, image_nb, x1, x2, y1, y2, masks):
+    def accept_tile_policy_pl(self, image_nb, x1, x2, y1, y2):
+        """
+        Tile acceptation policy for the pseudo-labeled data.
+        We accept images that have >0.9 score in them.
+        We allow for exceptions with a probability self.sampling_thresh.
+
+        Args:
+            image_nb (int): Image number.
+            x1 (int): Tile coordinate (top left x).
+            x2 (int): Tile coordinate (bottom left x).
+            y1 (int): Tile coordinate (top left y).
+            y2 (int): Tile coordinate (bottom left y).
+
+        Returns:
+            bool: Whether the tile is accepted.
+        """
         mid_x = int((x1 + x2) / 2)
         mid_y = int((y1 + y2) / 2)
         m = 250
-        if masks[image_nb][mid_x - m: mid_x + m, mid_y - m: mid_y + m].max() > 0.9:
+        if self.masks_test[image_nb][mid_x - m: mid_x + m, mid_y - m: mid_y + m].max() > 0.9:
             return True
 
         should_keep = np.random.rand()
@@ -435,13 +429,26 @@ class InMemoryTrainDataset(Dataset):
         else:
             return False
 
-    def accept_tile_policy_ext(
-        self, image_nb, x1, x2, y1, y2, masks
-    ):
+    def accept_tile_policy_ext(self, image_nb, x1, x2, y1, y2):
+        """
+        Tile acceptation policy for the extra data.
+        We accept images that have a glomeruli in them.
+        We allow for exceptions with a probability self.sampling_thresh.
+
+        Args:
+            image_nb (int): Image number.
+            x1 (int): Tile coordinate (top left x).
+            x2 (int): Tile coordinate (bottom left x).
+            y1 (int): Tile coordinate (top left y).
+            y2 (int): Tile coordinate (bottom left y).
+
+        Returns:
+            bool: Whether the tile is accepted.
+        """
         mid_x = int((x1 + x2) / 2)
         mid_y = int((y1 + y2) / 2)
         m = 250
-        if masks[image_nb][mid_x - m: mid_x + m, mid_y - m: mid_y + m].max() > 0:
+        if self.masks_extra[image_nb][mid_x - m: mid_x + m, mid_y - m: mid_y + m].max() > 0:
             return True
 
         should_keep = np.random.rand()
@@ -450,22 +457,45 @@ class InMemoryTrainDataset(Dataset):
         else:
             return False
 
-    def accept_tile_policy_zenodo(
-        self, image_nb, x1, x2, y1, y2, masks
-    ):
-        mid_x = int((x1 + x2) / 2)
-        mid_y = int((y1 + y2) / 2)
-        m = 5
-        if masks[image_nb][mid_x - m: mid_x + m, mid_y - m: mid_y + m].max() > 0:
-            return True
+    def getitem_normal(self, image_nb):
+        """
+        Returns an item from the training image image_nb.
+        """
+        img_dim = self.image_sizes[image_nb]
+        is_point_ok = False
 
-        should_keep = np.random.rand()
-        if should_keep > self.sampling_thresh:
-            return True
-        else:
-            return False
+        while not is_point_ok:
+            # Sample random point
+            x1 = np.random.randint(img_dim[0] - self.before_crop_size)
+            x2 = x1 + self.before_crop_size
+
+            y1 = np.random.randint(img_dim[1] - self.before_crop_size)
+            y2 = y1 + self.before_crop_size
+
+            is_point_ok = self.accept_tile_policy_normal(
+                image_nb, x1, x2, y1, y2,
+            )
+
+        img = self.imgs[image_nb][x1:x2, y1:y2]
+        mask = self.masks[image_nb][x1:x2, y1:y2]
+
+        if self.num_classes == 2:
+            mask = np.array([
+                mask == 1,
+                ((mask == 2) + (mask == 3)) > 0,
+            ]).transpose(1, 2, 0).astype(np.uint8)
+
+        if self.transforms:
+            augmented = self.transforms(image=img, mask=mask)
+            img = augmented["image"]
+            mask = augmented["mask"]
+
+        return img, mask.float(), 1
 
     def getitem_pl(self):
+        """
+        Returns an item from the pseudo-labels.
+        """
         image_nb = np.random.choice(
             range(len(self.imgs_test)), replace=True, p=self.sampling_probs_test
         )
@@ -480,9 +510,7 @@ class InMemoryTrainDataset(Dataset):
             y1 = np.random.randint(img_dim[1] - self.before_crop_size)
             y2 = y1 + self.before_crop_size
 
-            is_point_ok = self.accept_tile_policy_pl(
-                image_nb, x1, x2, y1, y2, self.masks_test,
-            )
+            is_point_ok = self.accept_tile_policy_pl(image_nb, x1, x2, y1, y2)
 
         img = self.imgs_test[image_nb][x1:x2, y1:y2]
         mask = self.masks_test[image_nb][x1:x2, y1:y2]
@@ -495,15 +523,12 @@ class InMemoryTrainDataset(Dataset):
             img = augmented["image"]
             mask = augmented["mask"]
 
-        if self.oof_preds is not None:  # not actually available
-            mask = mask.float()
-            oof_pred = mask.clone()
-        else:
-            oof_pred = 0
-
-        return img, mask.float(), oof_pred, 0
+        return img, mask.float(), 0
 
     def getitem_extra(self):
+        """
+        Returns an item from the external data.
+        """
         image_nb = np.random.choice(
             range(len(self.imgs_extra)), replace=True, p=self.sampling_probs_extra
         )
@@ -518,9 +543,7 @@ class InMemoryTrainDataset(Dataset):
             y1 = np.random.randint(img_dim[1] - self.before_crop_size)
             y2 = y1 + self.before_crop_size
 
-            is_point_ok = self.accept_tile_policy_ext(
-                image_nb, x1, x2, y1, y2, self.masks_extra,
-            )
+            is_point_ok = self.accept_tile_policy_ext(image_nb, x1, x2, y1, y2)
 
         img = self.imgs_extra[image_nb][x1:x2, y1:y2]
         mask = self.masks_extra[image_nb][x1:x2, y1:y2]
@@ -531,112 +554,25 @@ class InMemoryTrainDataset(Dataset):
                 ((mask == 2) + (mask == 3)) > 0
             ]).transpose(1, 2, 0).astype(np.uint8)
 
-        if self.oof_preds is not None:
-            if self.num_classes == 2:
-                raise NotImplementedError
-
         if self.transforms:
             augmented = self.transforms(image=img, mask=mask)
             img = augmented["image"]
             mask = augmented["mask"]
 
-        if self.oof_preds is not None:  # not actually available
-            mask = mask.float()
-            oof_pred = mask.clone()
-        else:
-            oof_pred = 0
-
-        return img, mask.float(), oof_pred, 1
-
-    def getitem_zenodo(self):
-        image_nb = np.random.choice(
-            range(len(self.imgs_zenodo)), replace=True, p=self.sampling_probs_zenodo
-        )
-
-        img_dim = self.image_sizes_zenodo[image_nb]
-        is_point_ok = False
-        while not is_point_ok:
-            # Sample random point
-            x1 = np.random.randint(img_dim[0] - self.before_crop_size)
-            x2 = x1 + self.before_crop_size
-
-            y1 = np.random.randint(img_dim[1] - self.before_crop_size)
-            y2 = y1 + self.before_crop_size
-
-            is_point_ok = self.accept_tile_policy_zenodo(
-                image_nb, x1, x2, y1, y2, self.masks_zenodo,
-            )
-
-        img = self.imgs_zenodo[image_nb][x1:x2, y1:y2]
-        mask = self.masks_zenodo[image_nb][x1:x2, y1:y2]
-
-        if self.num_classes == 2:
-            mask = np.array([
-                mask == 1,
-                mask == 2,
-            ]).transpose(1, 2, 0).astype(np.uint8)
-
-        if self.oof_preds is not None:
-            if self.num_classes == 2:
-                raise NotImplementedError
-
-        if self.transforms:
-            augmented = self.transforms(image=img, mask=mask)
-            img = augmented["image"]
-            mask = augmented["mask"]
-
-        if self.oof_preds is not None:  # not actually available
-            mask = mask.float()
-            oof_pred = mask.clone()
-        else:
-            oof_pred = 0
-
-        return img, mask.float(), oof_pred, 1
-
-    def getitem_normal(self, image_nb):
-        img_dim = self.image_sizes[image_nb]
-        is_point_ok = False
-
-        while not is_point_ok:
-            # Sample random point
-            x1 = np.random.randint(img_dim[0] - self.before_crop_size)
-            x2 = x1 + self.before_crop_size
-
-            y1 = np.random.randint(img_dim[1] - self.before_crop_size)
-            y2 = y1 + self.before_crop_size
-
-            is_point_ok = self.accept_tile_policy(
-                image_nb, x1, x2, y1, y2, self.masks, self.conv_hulls
-            )
-
-        img = self.imgs[image_nb][x1:x2, y1:y2]
-        mask = self.masks[image_nb][x1:x2, y1:y2]
-
-        if self.num_classes == 2:
-            mask = np.array([
-                mask == 1,
-                ((mask == 2) + (mask == 3)) > 0,
-            ]).transpose(1, 2, 0).astype(np.uint8)
-
-        if self.oof_preds is not None:
-            if self.num_classes == 2:
-                raise NotImplementedError
-            oof_pred = self.oof_preds[image_nb][x1:x2, y1:y2].astype(np.float32)
-            mask = np.array([mask, oof_pred]).transpose(1, 2, 0)
-
-        if self.transforms:
-            augmented = self.transforms(image=img, mask=mask)
-            img = augmented["image"]
-            mask = augmented["mask"]
-
-        if self.oof_preds is not None:
-            mask, oof_pred = mask[:, :, 0], mask[:, :, 1]
-        else:
-            oof_pred = 0
-
-        return img, mask.float(), oof_pred, 1
+        return img, mask.float(), 1
 
     def __getitem__(self, idx):
+        """
+        Returns an item. Randomly calls one of the specific getitem functions.
+
+        Args:
+            idx ([type]): [description]
+
+        Returns:
+            img (torch tensor [3 x H x W]): image.
+            mask (torch tensor [num_classes x H x W]): mask.
+            w (int): 0 if an item from the pseudo-labels is sampled, else 1.
+        """
 
         if self.sampling_thresh == 0:  # take uniformly from images for validation
             image_nb = self.used_img_idx[idx % len(self.used_img_idx)]
@@ -649,13 +585,6 @@ class InMemoryTrainDataset(Dataset):
             if self.use_external < value < self.use_external + self.use_pl:
                 return self.getitem_pl()
 
-            if (
-                self.use_external + self.use_pl
-                < value
-                < self.use_external + self.use_pl + self.use_zenodo
-            ):
-                return self.getitem_zenodo()
-
             image_nb = self.used_img_idx[
                 np.random.choice(
                     range(len(self.used_img_idx)), replace=True, p=self.sampling_probs
@@ -663,44 +592,3 @@ class InMemoryTrainDataset(Dataset):
             ]
 
         return self.getitem_normal(image_nb)
-
-
-class TileClsDataset(Dataset):
-    """
-    Dataset to read from tiled images.
-    """
-
-    def __init__(self, images, root="", transforms=None):
-        """
-        Args:
-            df (pandas dataframe): file_names.
-            img_dir (str, optional): Images directory. Defaults to "".
-            mask_dir (str, optional): Masks directory. Defaults to "".
-            transforms (albumentation transforms, optional) : Transforms. Defaults to None.
-        """
-        self.df = images
-        self.tiles = [root + p for p in os.listdir(root) if p.split("_")[0] in images]
-
-        self.transforms = transforms
-
-    def __len__(self):
-        return len(self.tiles)
-
-    def __getitem__(self, idx):
-        tile = np.load(self.tiles[idx])
-
-        img, mask = tile[:, :, :-2], tile[:, :, -2:]
-
-        img = (img * 255).astype(np.uint8)
-
-        target = mask[:, :, -1][mask.shape[0] // 2, mask.shape[1] // 2]
-
-        if self.transforms:
-            augmented = self.transforms(image=img, mask=mask)
-            img = augmented["image"]
-            mask = augmented["mask"]
-
-        img = torch.cat([img, mask[:, :, 0].unsqueeze(0)], 0)
-        mask = mask[:, :, -1]
-
-        return img, mask, target
