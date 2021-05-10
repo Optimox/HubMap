@@ -1,18 +1,19 @@
-# HubMap
-Kaggle HubMap
+# HuBMAP - Hacking the Kidney Competition
+
+#### Status
+- Document code : Done
+- Clean notebooks : Almost Done
+- Make ReadMe : TO DO
 
 
-Basic pipeline so far.
+## How to get started
 
-Almost full pipeline implemented so far (except prediction inside Kaggle Notebook)
-
-
-### How to get started
-
-- Clone the repo
-- Environment : not specified
-- Download the data from Kaggle and put in `input/`
+- Clone the repository
+- Download the data from Kaggle and put it in `input/`
 - Create lower resoltion masks :  `notebooks/Image downscaling.ipynb`
 - Train models : `notebooks/Training.ipynb`
 - Validate models : `notebooks/Inference.ipynb`
 - Visualize predictions : `notebooks/Visualize Predictions.ipynb`
+
+
+[WIP]
