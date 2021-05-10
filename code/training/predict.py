@@ -54,7 +54,7 @@ def predict_entire_mask_downscaled(dataset, model, batch_size=32, tta=False):
 
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
 
-    weighting = torch.from_numpy(get_tile_weighting(dataset.tile_size, sigma=1, alpha=1))
+    weighting = torch.from_numpy(get_tile_weighting(dataset.tile_size))
     weighting_cuda = weighting.clone().cuda().unsqueeze(0)
     weighting = weighting.cuda().half()
 
@@ -102,7 +102,7 @@ def predict_entire_mask_downscaled(dataset, model, batch_size=32, tta=False):
 def predict_entire_mask(dataset, model, batch_size=32, tta=False):
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
 
-    weighting = torch.from_numpy(get_tile_weighting(dataset.tile_size, sigma=1, alpha=1))
+    weighting = torch.from_numpy(get_tile_weighting(dataset.tile_size))
     weighting_cuda = weighting.clone().cuda().unsqueeze(0)
     weighting = weighting.cuda().half()
 
@@ -148,5 +148,55 @@ def predict_entire_mask(dataset, model, batch_size=32, tta=False):
 
     for i in range(len(global_pred)):
         global_pred[i] = torch.div(global_pred[i], global_counter[i])
+
+    return global_pred
+
+
+def predict_entire_mask_downscaled_tta(dataset, model, batch_size=32):
+
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, pin_memory=True)
+
+    weighting = torch.from_numpy(get_tile_weighting(dataset.tile_size))
+    weighting_cuda = weighting.clone().cuda().unsqueeze(0).unsqueeze(0)
+    weighting = weighting.cuda().half()
+
+    global_pred = torch.zeros(
+        (4, dataset.orig_size[0], dataset.orig_size[1]),
+        dtype=torch.half, device="cuda"
+    )
+    global_counter = torch.zeros(
+        (1, dataset.orig_size[0], dataset.orig_size[1]),
+        dtype=torch.half, device="cuda"
+    )
+
+    model.eval()
+    with torch.no_grad():
+        for img, pos in loader:
+            img = img.to("cuda")
+            _, _, h, w = img.shape
+
+            preds = []
+            if model.num_classes == 2:
+                pred = model(img)[:, 0].view(1, -1, h, w).sigmoid().detach()
+            else:
+                pred = model(img).view(1, -1, h, w).sigmoid().detach()
+            preds.append(pred)
+
+            for f in FLIPS:
+                pred_flip = model(torch.flip(img, f))
+                if model.num_classes == 2:
+                    pred_flip = pred_flip[:, 0]
+                pred_flip = torch.flip(pred_flip, f).view(1, -1, h, w).sigmoid().detach()
+                preds.append(pred_flip)
+
+            pred = torch.cat(preds, 0)
+            pred = (pred * weighting_cuda).half()
+
+            for tile_idx, (x0, x1, y0, y1) in enumerate(pos):
+                global_pred[:, x0: x1, y0: y1] += pred[:, tile_idx]
+                global_counter[:, x0: x1, y0: y1] += weighting
+
+    for i in range(global_pred.size(1)):
+        global_pred[:, i] = torch.div(global_pred[:, i], global_counter[:, i])
 
     return global_pred

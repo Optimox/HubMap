@@ -139,7 +139,7 @@ def plot_contours_preds(img, preds, mask=None, w=1, downsize=1):
         cv2.polylines(img_gt, contours, True, (1.0, 0.0, 0.0), w)
         img = (img + img_gt) / 2
 
-    return px.imshow(img)
+    return px.imshow(img), img
 
 
 def plot_heatmap_preds(img, preds, mask=None, w=1, downsize=1):

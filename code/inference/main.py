@@ -6,6 +6,7 @@ from training.predict import (
     predict_entire_mask_downscaled,
     predict_entire_mask,
     threshold_resize_torch,
+    predict_entire_mask_downscaled_tta
 )
 
 from model_zoo.models import define_model
@@ -28,7 +29,8 @@ def validate_inf(
     use_full_size=True,
     global_threshold=None,
     use_tta=False,
-    save=False
+    save=False,
+    save_all_tta=False,
 ):
     df_info = pd.read_csv(DATA_PATH + "HuBMAP-20-dataset_information.csv")
 
@@ -58,23 +60,36 @@ def validate_inf(
             transforms=HE_preprocess_test(augment=False, visualize=False),
         )
 
-        if use_full_size:
-            global_pred = predict_entire_mask(
-                predict_dataset, model, batch_size=config.val_bs, tta=use_tta
+        if save_all_tta:
+            global_pred = predict_entire_mask_downscaled_tta(
+                predict_dataset, model, batch_size=config.val_bs
             )
-            threshold, score = 0.4, 0
+            np.save(
+                log_folder + f"pred_{img}.npy",
+                global_pred.cpu().numpy()
+            )
+
+            global_pred = global_pred.mean(0)
 
         else:
-            global_pred = predict_entire_mask_downscaled(
-                predict_dataset, model, batch_size=config.val_bs, tta=use_tta
-            )
+            if use_full_size:
+                global_pred = predict_entire_mask(
+                    predict_dataset, model, batch_size=config.val_bs, tta=use_tta
+                )
+                threshold, score = 0.4, 0
 
-            threshold, score = tweak_threshold(
-                mask=torch.from_numpy(predict_dataset.mask).cuda(), pred=global_pred
-            )
-            print(
-                f" - Scored {score :.4f} for downscaled image {img} with threshold {threshold:.2f}"
-            )
+            else:
+                global_pred = predict_entire_mask_downscaled(
+                    predict_dataset, model, batch_size=config.val_bs, tta=use_tta
+                )
+
+                threshold, score = tweak_threshold(
+                    mask=torch.from_numpy(predict_dataset.mask).cuda(), pred=global_pred
+                )
+                print(
+                    f" - Scored {score :.4f} for downscaled"
+                    f"image {img} with threshold {threshold:.2f}"
+                )
 
         shape = df_info[df_info.image_file == img + ".tiff"][
             ["width_pixels", "height_pixels"]
@@ -85,7 +100,7 @@ def validate_inf(
             global_threshold if global_threshold is not None else threshold
         )
 
-        if save:
+        if save and not save_all_tta:
             np.save(
                 log_folder + f"pred_{img}.npy",
                 global_pred.cpu().numpy()
@@ -116,6 +131,7 @@ def k_fold_inf(
     global_threshold=None,
     use_tta=False,
     save=False,
+    save_all_tta=False,
 ):
     """
     Args:
@@ -159,6 +175,7 @@ def k_fold_inf(
                 global_threshold=global_threshold,
                 use_tta=use_tta,
                 save=save,
+                save_all_tta=save_all_tta,
             )
 
             # break

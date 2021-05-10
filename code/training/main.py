@@ -151,7 +151,7 @@ def k_fold(config, log_folder=None):
     if isinstance(config.extra_path, list):
         df_rle_extra = [pd.read_csv(path) for path in config.extra_path]
     else:
-        df_rle_extra = pd.read_csv(config.extra_path)
+        df_rle_extra = pd.read_csv(config.extra_path) if config.extra_path is not None else None
 
     in_mem_dataset = InMemoryTrainDataset(
         train_img_names,
@@ -170,6 +170,7 @@ def k_fold(config, log_folder=None):
         test_path=f"../input/test_{config.reduce_factor}/",
         df_rle_extra=df_rle_extra,
         use_external=config.use_external,
+        use_zenodo=config.use_zenodo,
     )
     print(f"Done in {time.time() - start_time :.0f} seconds.")
 

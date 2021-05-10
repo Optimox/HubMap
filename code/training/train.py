@@ -175,7 +175,7 @@ def fit(
         model.eval()
         dataset.train(False)
         avg_val_loss = 0.
-        meter.reset()
+        metrics = meter.reset()
 
         if epoch + 1 >= first_epoch_eval:
             with torch.no_grad():
@@ -214,7 +214,7 @@ def fit(
 
                     meter.update(y_batch, y_pred)
 
-        metrics = meter.compute()
+            metrics = meter.compute()
 
         elapsed_time = time.time() - start_time
         if (epoch + 1) % verbose == 0:

@@ -8,7 +8,7 @@ import tifffile as tiff
 from pathlib import Path
 from torch.utils.data import Dataset
 
-from params import DATA_PATH, DATA_PATH_EXTRA
+from params import DATA_PATH, DATA_PATH_EXTRA, ZENODO_PATH
 from utils.rle import enc2mask
 from skimage.morphology import convex_hull_image
 
@@ -187,6 +187,7 @@ class InMemoryTrainDataset(Dataset):
         test_path="../input/test/",
         df_rle_extra=None,
         use_pl=0,
+        use_zenodo=0,
     ):
         """"""
         # Hard coded external path for now
@@ -228,7 +229,7 @@ class InMemoryTrainDataset(Dataset):
                 mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
                 rle = df_rle[1].loc[df_rle[1].id == img_name, "encoding"]
                 mask += 2 * enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
-                mask = np.clip(mask, 0, 2)
+                # mask = np.clip(mask, 0, 2)
                 self.num_classes = 2
             else:
                 rle = df_rle.loc[df_rle.id == img_name, "encoding"]
@@ -263,7 +264,7 @@ class InMemoryTrainDataset(Dataset):
         self.masks_test = []
         self.pl_path = pl_path
         if pl_path is not None:
-            self.img_names_test = [p[:-5] for p in os.listdir(test_path)]  # hardcoded
+            self.img_names_test = [p[:-5] for p in os.listdir(test_path)]
 
             for img_name in self.img_names_test:
                 img = simple_load(os.path.join(test_path, img_name + ".tiff"))
@@ -274,7 +275,6 @@ class InMemoryTrainDataset(Dataset):
         self.imgs_extra = []
         self.image_sizes_extra = []
         self.masks_extra = []
-        self.conv_hulls_extra = []
 
         if df_rle_extra is not None:
             df_extra_ph = df_rle_extra[0] if isinstance(df_rle_extra, list) else df_rle_extra[0]
@@ -287,7 +287,7 @@ class InMemoryTrainDataset(Dataset):
                     mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
                     rle = df_rle_extra[1].loc[df_rle_extra[1].id == img_name, "encoding"]
                     mask += 2 * enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
-                    mask = np.clip(mask, 0, 2)
+                    # mask = np.clip(mask, 0, 2)
                 else:
                     rle = df_rle_extra.loc[df_rle_extra.id == img_name, "encoding"]
                     mask = enc2mask(rle, (orig_img_size[1], orig_img_size[0]))
@@ -308,12 +308,39 @@ class InMemoryTrainDataset(Dataset):
                 self.image_sizes_extra.append(img.shape)
                 self.masks_extra.append(mask)
 
-                if self.sampling_mode == "convhull":
-                    conv_hull = convex_hull_image(mask)
-                    self.conv_hulls_extra.append(conv_hull)
-
         self.sampling_probs_extra = np.array([np.sum(mask == 1) for mask in self.masks_extra])
         self.sampling_probs_extra = self.sampling_probs_extra / np.sum(self.sampling_probs_extra)
+
+        # Zenodo data
+        self.imgs_zenodo = []
+        self.image_sizes_zenodo = []
+        self.masks_zenodo = []
+        self.use_zenodo = use_zenodo
+        if use_zenodo > 0:
+            imgs = [p[:-4] for p in os.listdir(ZENODO_PATH) if p.endswith(".png")]
+
+            for img_name in imgs:
+                img = cv2.imread(ZENODO_PATH + img_name + ".png")
+                mask = np.load(ZENODO_PATH + img_name + "_mask.npy")
+
+                if reduce_factor > 2:
+                    img = cv2.resize(
+                        img,
+                        (img.shape[1] // reduce_factor * 2, img.shape[0] // reduce_factor * 2),
+                        interpolation=cv2.INTER_AREA,
+                    )
+                    mask = cv2.resize(
+                        mask,
+                        (mask.shape[1] // reduce_factor * 2, mask.shape[0] // reduce_factor * 2),
+                        interpolation=cv2.INTER_NEAREST,
+                    )
+
+                self.imgs_zenodo.append(img)
+                self.image_sizes_zenodo.append(img.shape)
+                self.masks_zenodo.append(mask)
+
+        self.sampling_probs_zenodo = np.array([np.sum(mask == 1) for mask in self.masks_zenodo])
+        self.sampling_probs_zenodo = self.sampling_probs_zenodo / np.sum(self.sampling_probs_zenodo)
 
         # Deal with fold inside this to avoid reloading for each fold (time consuming)
         self.update_fold_nb(self.fold_nb, load=False)
@@ -368,27 +395,17 @@ class InMemoryTrainDataset(Dataset):
     def __len__(self):
         return self.iter_per_epoch
 
-    def accept_tile_policy_pl(self, image_nb, x1, x2, y1, y2, masks):
-        if np.max(masks[image_nb][x1 + 50: x2 - 50, y1 + 50: y2 - 50]) > 0.9:
-            return True
-
-        should_keep = np.random.rand()
-        if should_keep < 1e-3:
-            return True
-        else:
-            return False
-
     def accept_tile_policy(
-        self, image_nb, x1, x2, y1, y2, masks, convhulls, sampling_thresh=None
+        self, image_nb, x1, x2, y1, y2, masks, convhulls
     ):
-        sampling_thresh = self.sampling_thresh if sampling_thresh is None else sampling_thresh
         if self.sampling_thresh == 0:
             return True
 
         if self.sampling_mode == "centered":
             mid_x = int((x1 + x2) / 2)
             mid_y = int((y1 + y2) / 2)
-            if masks[image_nb][mid_x - 10: mid_x + 10, mid_y - 10: mid_y + 10].max() > 0:
+            m = 10
+            if masks[image_nb][mid_x - m: mid_x + m, mid_y - m: mid_y + m].max() > 0:
                 return True
         elif self.sampling_mode == "convhull":
             if convhulls[image_nb][int((x1 + x2) / 2), int((y1 + y2) / 2)]:
@@ -400,7 +417,20 @@ class InMemoryTrainDataset(Dataset):
             return True
 
         should_keep = np.random.rand()
-        if should_keep > sampling_thresh:
+        if should_keep > self.sampling_thresh:
+            return True
+        else:
+            return False
+
+    def accept_tile_policy_pl(self, image_nb, x1, x2, y1, y2, masks):
+        mid_x = int((x1 + x2) / 2)
+        mid_y = int((y1 + y2) / 2)
+        m = 250
+        if masks[image_nb][mid_x - m: mid_x + m, mid_y - m: mid_y + m].max() > 0.9:
+            return True
+
+        should_keep = np.random.rand()
+        if should_keep > self.sampling_thresh:
             return True
         else:
             return False
@@ -408,11 +438,29 @@ class InMemoryTrainDataset(Dataset):
     def accept_tile_policy_ext(
         self, image_nb, x1, x2, y1, y2, masks
     ):
-        if np.max(masks[image_nb][x1 + 50: x2 - 50, y1 + 50: y2 - 50]) >= 1:
+        mid_x = int((x1 + x2) / 2)
+        mid_y = int((y1 + y2) / 2)
+        m = 250
+        if masks[image_nb][mid_x - m: mid_x + m, mid_y - m: mid_y + m].max() > 0:
             return True
 
         should_keep = np.random.rand()
-        if should_keep < 1e-3:
+        if should_keep > self.sampling_thresh:
+            return True
+        else:
+            return False
+
+    def accept_tile_policy_zenodo(
+        self, image_nb, x1, x2, y1, y2, masks
+    ):
+        mid_x = int((x1 + x2) / 2)
+        mid_y = int((y1 + y2) / 2)
+        m = 5
+        if masks[image_nb][mid_x - m: mid_x + m, mid_y - m: mid_y + m].max() > 0:
+            return True
+
+        should_keep = np.random.rand()
+        if should_keep > self.sampling_thresh:
             return True
         else:
             return False
@@ -478,7 +526,55 @@ class InMemoryTrainDataset(Dataset):
         mask = self.masks_extra[image_nb][x1:x2, y1:y2]
 
         if self.num_classes == 2:
-            mask = np.array([mask == 1, mask == 2]).transpose(1, 2, 0).astype(np.uint8)
+            mask = np.array([
+                ((mask == 1) + (mask == 3)) > 0,
+                ((mask == 2) + (mask == 3)) > 0
+            ]).transpose(1, 2, 0).astype(np.uint8)
+
+        if self.oof_preds is not None:
+            if self.num_classes == 2:
+                raise NotImplementedError
+
+        if self.transforms:
+            augmented = self.transforms(image=img, mask=mask)
+            img = augmented["image"]
+            mask = augmented["mask"]
+
+        if self.oof_preds is not None:  # not actually available
+            mask = mask.float()
+            oof_pred = mask.clone()
+        else:
+            oof_pred = 0
+
+        return img, mask.float(), oof_pred, 1
+
+    def getitem_zenodo(self):
+        image_nb = np.random.choice(
+            range(len(self.imgs_zenodo)), replace=True, p=self.sampling_probs_zenodo
+        )
+
+        img_dim = self.image_sizes_zenodo[image_nb]
+        is_point_ok = False
+        while not is_point_ok:
+            # Sample random point
+            x1 = np.random.randint(img_dim[0] - self.before_crop_size)
+            x2 = x1 + self.before_crop_size
+
+            y1 = np.random.randint(img_dim[1] - self.before_crop_size)
+            y2 = y1 + self.before_crop_size
+
+            is_point_ok = self.accept_tile_policy_zenodo(
+                image_nb, x1, x2, y1, y2, self.masks_zenodo,
+            )
+
+        img = self.imgs_zenodo[image_nb][x1:x2, y1:y2]
+        mask = self.masks_zenodo[image_nb][x1:x2, y1:y2]
+
+        if self.num_classes == 2:
+            mask = np.array([
+                mask == 1,
+                mask == 2,
+            ]).transpose(1, 2, 0).astype(np.uint8)
 
         if self.oof_preds is not None:
             if self.num_classes == 2:
@@ -517,7 +613,10 @@ class InMemoryTrainDataset(Dataset):
         mask = self.masks[image_nb][x1:x2, y1:y2]
 
         if self.num_classes == 2:
-            mask = np.array([mask == 1, mask == 2]).transpose(1, 2, 0).astype(np.uint8)
+            mask = np.array([
+                mask == 1,
+                ((mask == 2) + (mask == 3)) > 0,
+            ]).transpose(1, 2, 0).astype(np.uint8)
 
         if self.oof_preds is not None:
             if self.num_classes == 2:
@@ -542,11 +641,20 @@ class InMemoryTrainDataset(Dataset):
         if self.sampling_thresh == 0:  # take uniformly from images for validation
             image_nb = self.used_img_idx[idx % len(self.used_img_idx)]
         else:
-            if np.random.rand() < self.use_external:
+            value = np.random.rand()
+
+            if value < self.use_external:
                 return self.getitem_extra()
 
-            if np.random.rand() < self.use_pl:
+            if self.use_external < value < self.use_external + self.use_pl:
                 return self.getitem_pl()
+
+            if (
+                self.use_external + self.use_pl
+                < value
+                < self.use_external + self.use_pl + self.use_zenodo
+            ):
+                return self.getitem_zenodo()
 
             image_nb = self.used_img_idx[
                 np.random.choice(

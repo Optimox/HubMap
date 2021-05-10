@@ -20,7 +20,7 @@ STD = np.array([0.15825711, 0.24371008, 0.13832686])
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 DATA_PATH_EXTRA = DATA_PATH + "extra_tiff/"
-
+ZENODO_PATH = "../input/zenodo_2/"
 
 EXTRA_IMGS = ["VAN0003-LK-32-21-PAS_registered.ome", "VAN0011-RK-3-10-PAS_registered.ome"]
 EXTRA_IMGS_SHAPES = {
