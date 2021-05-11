@@ -1,0 +1,281 @@
+Creating in-memory dataset ...
+Done in 46 seconds.
+
+-------------   Fold 1 / 5  -------------
+
+    -> 8757250 trainable parameters
+    -> Validation images : ['2f6ecfcdf', 'b2dc8411c', '4ef6695ce'] 
+
+Epoch 01/40 	 lr=5.0e-04	 t=251s	loss=0.315	
+Epoch 02/40 	 lr=1.0e-03	 t=251s	loss=0.046	
+Epoch 03/40 	 lr=9.7e-04	 t=255s	loss=0.030	
+Epoch 04/40 	 lr=9.5e-04	 t=255s	loss=0.027	
+Epoch 05/40 	 lr=9.2e-04	 t=260s	loss=0.024	
+Epoch 06/40 	 lr=8.9e-04	 t=260s	loss=0.023	
+Epoch 07/40 	 lr=8.7e-04	 t=258s	loss=0.021	
+Epoch 08/40 	 lr=8.4e-04	 t=249s	loss=0.021	
+Epoch 09/40 	 lr=8.2e-04	 t=246s	loss=0.020	
+Epoch 10/40 	 lr=7.9e-04	 t=247s	loss=0.020	
+Epoch 11/40 	 lr=7.6e-04	 t=252s	loss=0.020	
+Epoch 12/40 	 lr=7.4e-04	 t=259s	loss=0.020	
+Epoch 13/40 	 lr=7.1e-04	 t=257s	loss=0.019	
+Epoch 14/40 	 lr=6.8e-04	 t=251s	loss=0.018	
+Epoch 15/40 	 lr=6.6e-04	 t=256s	loss=0.018	
+Epoch 16/40 	 lr=6.3e-04	 t=241s	loss=0.019	
+Epoch 17/40 	 lr=6.1e-04	 t=252s	loss=0.018	
+Epoch 18/40 	 lr=5.8e-04	 t=252s	loss=0.018	
+Epoch 19/40 	 lr=5.5e-04	 t=253s	loss=0.018	
+Epoch 20/40 	 lr=5.3e-04	 t=258s	loss=0.018	
+Epoch 21/40 	 lr=5.0e-04	 t=249s	loss=0.017	
+Epoch 22/40 	 lr=4.7e-04	 t=255s	loss=0.017	
+Epoch 23/40 	 lr=4.5e-04	 t=264s	loss=0.017	
+Epoch 24/40 	 lr=4.2e-04	 t=257s	loss=0.016	
+Epoch 25/40 	 lr=3.9e-04	 t=263s	loss=0.016	
+Epoch 26/40 	 lr=3.7e-04	 t=259s	loss=0.016	
+Epoch 27/40 	 lr=3.4e-04	 t=255s	loss=0.016	
+Epoch 28/40 	 lr=3.2e-04	 t=252s	loss=0.015	
+Epoch 29/40 	 lr=2.9e-04	 t=258s	loss=0.016	
+Epoch 30/40 	 lr=2.6e-04	 t=289s	loss=0.015	val_loss=0.004 	 dice=0.9639
+Epoch 31/40 	 lr=2.4e-04	 t=298s	loss=0.015	val_loss=0.005 	 dice=0.9611
+Epoch 32/40 	 lr=2.1e-04	 t=304s	loss=0.015	val_loss=0.005 	 dice=0.9638
+Epoch 33/40 	 lr=1.8e-04	 t=303s	loss=0.015	val_loss=0.005 	 dice=0.9621
+Epoch 34/40 	 lr=1.6e-04	 t=310s	loss=0.015	val_loss=0.004 	 dice=0.9669
+Epoch 35/40 	 lr=1.3e-04	 t=293s	loss=0.014	val_loss=0.004 	 dice=0.9631
+Epoch 36/40 	 lr=1.1e-04	 t=301s	loss=0.015	val_loss=0.004 	 dice=0.9650
+Epoch 37/40 	 lr=7.9e-05	 t=291s	loss=0.014	val_loss=0.004 	 dice=0.9647
+Epoch 38/40 	 lr=5.3e-05	 t=310s	loss=0.014	val_loss=0.005 	 dice=0.9643
+Epoch 39/40 	 lr=2.6e-05	 t=300s	loss=0.014	val_loss=0.004 	 dice=0.9638
+Epoch 40/40 	 lr=0.0e+00	 t=307s	loss=0.014	val_loss=0.004 	 dice=0.9672
+
+ -> Saving weights to ../logs/2021-05-09/2/Unet_efficientnet-b1_0.pt
+
+
+    -> Validating 
+
+ - Scored 0.9598 for downscaled image 2f6ecfcdf with threshold 0.45
+ - Scored 0.9573 for downscaled image b2dc8411c with threshold 0.40
+ - Scored 0.9456 for downscaled image 4ef6695ce with threshold 0.45
+
+
+-------------   Fold 2 / 5  -------------
+
+    -> 8757250 trainable parameters
+    -> Validation images : ['8242609fa', '0486052bb', '26dc41664'] 
+
+Epoch 01/40 	 lr=5.0e-04	 t=260s	loss=0.316	
+Epoch 02/40 	 lr=1.0e-03	 t=280s	loss=0.048	
+Epoch 03/40 	 lr=9.7e-04	 t=259s	loss=0.031	
+Epoch 04/40 	 lr=9.5e-04	 t=257s	loss=0.028	
+Epoch 05/40 	 lr=9.2e-04	 t=332s	loss=0.026	
+Epoch 06/40 	 lr=8.9e-04	 t=262s	loss=0.023	
+Epoch 07/40 	 lr=8.7e-04	 t=261s	loss=0.023	
+Epoch 08/40 	 lr=8.4e-04	 t=250s	loss=0.023	
+Epoch 09/40 	 lr=8.2e-04	 t=247s	loss=0.022	
+Epoch 10/40 	 lr=7.9e-04	 t=248s	loss=0.020	
+Epoch 11/40 	 lr=7.6e-04	 t=253s	loss=0.021	
+Epoch 12/40 	 lr=7.4e-04	 t=261s	loss=0.019	
+Epoch 13/40 	 lr=7.1e-04	 t=259s	loss=0.020	
+Epoch 14/40 	 lr=6.8e-04	 t=252s	loss=0.019	
+Epoch 15/40 	 lr=6.6e-04	 t=258s	loss=0.020	
+Epoch 16/40 	 lr=6.3e-04	 t=242s	loss=0.019	
+Epoch 17/40 	 lr=6.1e-04	 t=254s	loss=0.019	
+Epoch 18/40 	 lr=5.8e-04	 t=253s	loss=0.019	
+Epoch 19/40 	 lr=5.5e-04	 t=252s	loss=0.020	
+Epoch 20/40 	 lr=5.3e-04	 t=258s	loss=0.017	
+Epoch 21/40 	 lr=5.0e-04	 t=251s	loss=0.018	
+Epoch 22/40 	 lr=4.7e-04	 t=256s	loss=0.019	
+Epoch 23/40 	 lr=4.5e-04	 t=266s	loss=0.017	
+Epoch 24/40 	 lr=4.2e-04	 t=257s	loss=0.017	
+Epoch 25/40 	 lr=3.9e-04	 t=263s	loss=0.017	
+Epoch 26/40 	 lr=3.7e-04	 t=258s	loss=0.018	
+Epoch 27/40 	 lr=3.4e-04	 t=255s	loss=0.017	
+Epoch 28/40 	 lr=3.2e-04	 t=252s	loss=0.016	
+Epoch 29/40 	 lr=2.9e-04	 t=258s	loss=0.016	
+Epoch 30/40 	 lr=2.6e-04	 t=289s	loss=0.016	val_loss=0.005 	 dice=0.9601
+Epoch 31/40 	 lr=2.4e-04	 t=299s	loss=0.016	val_loss=0.005 	 dice=0.9644
+Epoch 32/40 	 lr=2.1e-04	 t=304s	loss=0.015	val_loss=0.005 	 dice=0.9625
+Epoch 33/40 	 lr=1.8e-04	 t=303s	loss=0.015	val_loss=0.005 	 dice=0.9634
+Epoch 34/40 	 lr=1.6e-04	 t=310s	loss=0.015	val_loss=0.005 	 dice=0.9625
+Epoch 35/40 	 lr=1.3e-04	 t=294s	loss=0.015	val_loss=0.005 	 dice=0.9676
+Epoch 36/40 	 lr=1.1e-04	 t=301s	loss=0.015	val_loss=0.005 	 dice=0.9641
+Epoch 37/40 	 lr=7.9e-05	 t=292s	loss=0.015	val_loss=0.005 	 dice=0.9633
+Epoch 38/40 	 lr=5.3e-05	 t=309s	loss=0.015	val_loss=0.005 	 dice=0.9632
+Epoch 39/40 	 lr=2.6e-05	 t=301s	loss=0.016	val_loss=0.004 	 dice=0.9615
+Epoch 40/40 	 lr=0.0e+00	 t=306s	loss=0.015	val_loss=0.005 	 dice=0.9636
+
+ -> Saving weights to ../logs/2021-05-09/4/Unet_efficientnet-b1_1.pt
+
+
+    -> Validating 
+
+ - Scored 0.9587 for downscaled image 8242609fa with threshold 0.45
+ - Scored 0.9421 for downscaled image 0486052bb with threshold 0.50
+ - Scored 0.9532 for downscaled image 26dc41664 with threshold 0.45
+
+-------------   Fold 3 / 5  -------------
+
+    -> 8757250 trainable parameters
+    -> Validation images : ['aaa6a05cc', 'e79de561c', 'c68fe75ea'] 
+
+Epoch 01/40 	 lr=5.0e-04	 t=252s	loss=0.317	
+Epoch 02/40 	 lr=1.0e-03	 t=253s	loss=0.045	
+Epoch 03/40 	 lr=9.7e-04	 t=257s	loss=0.031	
+Epoch 04/40 	 lr=9.5e-04	 t=257s	loss=0.028	
+Epoch 05/40 	 lr=9.2e-04	 t=260s	loss=0.023	
+Epoch 06/40 	 lr=8.9e-04	 t=262s	loss=0.022	
+Epoch 07/40 	 lr=8.7e-04	 t=261s	loss=0.024	
+Epoch 08/40 	 lr=8.4e-04	 t=251s	loss=0.022	
+Epoch 09/40 	 lr=8.2e-04	 t=247s	loss=0.020	
+Epoch 10/40 	 lr=7.9e-04	 t=248s	loss=0.019	
+Epoch 11/40 	 lr=7.6e-04	 t=254s	loss=0.019	
+Epoch 12/40 	 lr=7.4e-04	 t=261s	loss=0.020	
+Epoch 13/40 	 lr=7.1e-04	 t=258s	loss=0.020	
+Epoch 14/40 	 lr=6.8e-04	 t=252s	loss=0.020	
+Epoch 15/40 	 lr=6.6e-04	 t=258s	loss=0.018	
+Epoch 16/40 	 lr=6.3e-04	 t=241s	loss=0.018	
+Epoch 17/40 	 lr=6.1e-04	 t=253s	loss=0.019	
+Epoch 18/40 	 lr=5.8e-04	 t=253s	loss=0.017	
+Epoch 19/40 	 lr=5.5e-04	 t=251s	loss=0.017	
+Epoch 20/40 	 lr=5.3e-04	 t=259s	loss=0.017	
+Epoch 21/40 	 lr=5.0e-04	 t=249s	loss=0.018	
+Epoch 22/40 	 lr=4.7e-04	 t=256s	loss=0.017	
+Epoch 23/40 	 lr=4.5e-04	 t=264s	loss=0.016	
+Epoch 24/40 	 lr=4.2e-04	 t=257s	loss=0.016	
+Epoch 25/40 	 lr=3.9e-04	 t=263s	loss=0.016	
+Epoch 26/40 	 lr=3.7e-04	 t=257s	loss=0.016	
+Epoch 27/40 	 lr=3.4e-04	 t=254s	loss=0.016	
+Epoch 28/40 	 lr=3.2e-04	 t=252s	loss=0.015	
+Epoch 29/40 	 lr=2.9e-04	 t=257s	loss=0.015	
+Epoch 30/40 	 lr=2.6e-04	 t=290s	loss=0.015	val_loss=0.011 	 dice=0.9252
+Epoch 31/40 	 lr=2.4e-04	 t=299s	loss=0.015	val_loss=0.011 	 dice=0.9362
+Epoch 32/40 	 lr=2.1e-04	 t=303s	loss=0.014	val_loss=0.012 	 dice=0.9276
+Epoch 33/40 	 lr=1.8e-04	 t=303s	loss=0.015	val_loss=0.010 	 dice=0.9327
+Epoch 34/40 	 lr=1.6e-04	 t=310s	loss=0.014	val_loss=0.010 	 dice=0.9325
+Epoch 35/40 	 lr=1.3e-04	 t=294s	loss=0.014	val_loss=0.010 	 dice=0.9288
+Epoch 36/40 	 lr=1.1e-04	 t=300s	loss=0.014	val_loss=0.010 	 dice=0.9357
+Epoch 37/40 	 lr=7.9e-05	 t=291s	loss=0.014	val_loss=0.010 	 dice=0.9368
+Epoch 38/40 	 lr=5.3e-05	 t=309s	loss=0.014	val_loss=0.010 	 dice=0.9317
+Epoch 39/40 	 lr=2.6e-05	 t=300s	loss=0.014	val_loss=0.011 	 dice=0.9345
+Epoch 40/40 	 lr=0.0e+00	 t=306s	loss=0.014	val_loss=0.010 	 dice=0.9339
+
+ -> Saving weights to ../logs/2021-05-09/4/Unet_efficientnet-b1_2.pt
+
+
+    -> Validating 
+
+ - Scored 0.9269 for downscaled image aaa6a05cc with threshold 0.45
+ - Scored 0.9458 for downscaled image e79de561c with threshold 0.60
+ - Scored 0.8823 for downscaled image c68fe75ea with threshold 0.60
+
+-------------   Fold 4 / 5  -------------
+
+    -> 8757250 trainable parameters
+    -> Validation images : ['cb2d976f4', '095bf7a1f', 'afa5e8098'] 
+
+Epoch 01/40 	 lr=5.0e-04	 t=253s	loss=0.317	
+Epoch 02/40 	 lr=1.0e-03	 t=253s	loss=0.046	
+Epoch 03/40 	 lr=9.7e-04	 t=258s	loss=0.030	
+Epoch 04/40 	 lr=9.5e-04	 t=257s	loss=0.025	
+Epoch 05/40 	 lr=9.2e-04	 t=261s	loss=0.023	
+Epoch 06/40 	 lr=8.9e-04	 t=261s	loss=0.024	
+Epoch 07/40 	 lr=8.7e-04	 t=260s	loss=0.020	
+Epoch 08/40 	 lr=8.4e-04	 t=251s	loss=0.020	
+Epoch 09/40 	 lr=8.2e-04	 t=248s	loss=0.019	
+Epoch 10/40 	 lr=7.9e-04	 t=248s	loss=0.021	
+Epoch 11/40 	 lr=7.6e-04	 t=255s	loss=0.021	
+Epoch 12/40 	 lr=7.4e-04	 t=261s	loss=0.019	
+Epoch 13/40 	 lr=7.1e-04	 t=259s	loss=0.017	
+Epoch 14/40 	 lr=6.8e-04	 t=252s	loss=0.019	
+Epoch 15/40 	 lr=6.6e-04	 t=258s	loss=0.018	
+Epoch 16/40 	 lr=6.3e-04	 t=242s	loss=0.018	
+Epoch 17/40 	 lr=6.1e-04	 t=254s	loss=0.017	
+Epoch 18/40 	 lr=5.8e-04	 t=253s	loss=0.017	
+Epoch 19/40 	 lr=5.5e-04	 t=252s	loss=0.018	
+Epoch 20/40 	 lr=5.3e-04	 t=258s	loss=0.017	
+Epoch 21/40 	 lr=5.0e-04	 t=250s	loss=0.017	
+Epoch 22/40 	 lr=4.7e-04	 t=256s	loss=0.018	
+Epoch 23/40 	 lr=4.5e-04	 t=264s	loss=0.016	
+Epoch 24/40 	 lr=4.2e-04	 t=258s	loss=0.016	
+Epoch 25/40 	 lr=3.9e-04	 t=263s	loss=0.015	
+Epoch 26/40 	 lr=3.7e-04	 t=257s	loss=0.017	
+Epoch 27/40 	 lr=3.4e-04	 t=255s	loss=0.016	
+Epoch 28/40 	 lr=3.2e-04	 t=252s	loss=0.015	
+Epoch 29/40 	 lr=2.9e-04	 t=261s	loss=0.015	
+Epoch 30/40 	 lr=2.6e-04	 t=290s	loss=0.014	val_loss=0.008 	 dice=0.9549
+Epoch 31/40 	 lr=2.4e-04	 t=299s	loss=0.014	val_loss=0.008 	 dice=0.9590
+Epoch 32/40 	 lr=2.1e-04	 t=305s	loss=0.015	val_loss=0.008 	 dice=0.9539
+Epoch 33/40 	 lr=1.8e-04	 t=305s	loss=0.015	val_loss=0.007 	 dice=0.9593
+Epoch 34/40 	 lr=1.6e-04	 t=310s	loss=0.014	val_loss=0.007 	 dice=0.9599
+Epoch 35/40 	 lr=1.3e-04	 t=295s	loss=0.014	val_loss=0.007 	 dice=0.9645
+Epoch 36/40 	 lr=1.1e-04	 t=303s	loss=0.014	val_loss=0.008 	 dice=0.9541
+Epoch 37/40 	 lr=7.9e-05	 t=293s	loss=0.014	val_loss=0.007 	 dice=0.9589
+Epoch 38/40 	 lr=5.3e-05	 t=310s	loss=0.014	val_loss=0.007 	 dice=0.9583
+Epoch 39/40 	 lr=2.6e-05	 t=302s	loss=0.013	val_loss=0.006 	 dice=0.9604
+Epoch 40/40 	 lr=0.0e+00	 t=307s	loss=0.013	val_loss=0.007 	 dice=0.9569
+
+ -> Saving weights to ../logs/2021-05-09/4/Unet_efficientnet-b1_3.pt
+
+
+    -> Validating 
+
+ - Scored 0.9497 for downscaled image cb2d976f4 with threshold 0.55
+ - Scored 0.9408 for downscaled image 095bf7a1f with threshold 0.50
+ - Scored 0.9296 for downscaled image afa5e8098 with threshold 0.40
+
+-------------   Fold 5 / 5  -------------
+
+    -> 8757250 trainable parameters
+    -> Validation images : ['b9a3865fc', '54f2eec69', '1e2425f28'] 
+
+Epoch 01/40 	 lr=5.0e-04	 t=251s	loss=0.318	
+Epoch 02/40 	 lr=1.0e-03	 t=251s	loss=0.046	
+Epoch 03/40 	 lr=9.7e-04	 t=257s	loss=0.032	
+Epoch 04/40 	 lr=9.5e-04	 t=256s	loss=0.025	
+Epoch 05/40 	 lr=9.2e-04	 t=260s	loss=0.025	
+Epoch 06/40 	 lr=8.9e-04	 t=260s	loss=0.022	
+Epoch 07/40 	 lr=8.7e-04	 t=259s	loss=0.023	
+Epoch 08/40 	 lr=8.4e-04	 t=249s	loss=0.021	
+Epoch 09/40 	 lr=8.2e-04	 t=246s	loss=0.019	
+Epoch 10/40 	 lr=7.9e-04	 t=247s	loss=0.020	
+Epoch 11/40 	 lr=7.6e-04	 t=254s	loss=0.021	
+Epoch 12/40 	 lr=7.4e-04	 t=260s	loss=0.019	
+Epoch 13/40 	 lr=7.1e-04	 t=258s	loss=0.019	
+Epoch 14/40 	 lr=6.8e-04	 t=251s	loss=0.019	
+Epoch 15/40 	 lr=6.6e-04	 t=256s	loss=0.019	
+Epoch 16/40 	 lr=6.3e-04	 t=242s	loss=0.018	
+Epoch 17/40 	 lr=6.1e-04	 t=253s	loss=0.018	
+Epoch 18/40 	 lr=5.8e-04	 t=256s	loss=0.017	
+Epoch 19/40 	 lr=5.5e-04	 t=252s	loss=0.017	
+Epoch 20/40 	 lr=5.3e-04	 t=257s	loss=0.017	
+Epoch 21/40 	 lr=5.0e-04	 t=250s	loss=0.017	
+Epoch 22/40 	 lr=4.7e-04	 t=255s	loss=0.016	
+Epoch 23/40 	 lr=4.5e-04	 t=264s	loss=0.016	
+Epoch 24/40 	 lr=4.2e-04	 t=257s	loss=0.016	
+Epoch 25/40 	 lr=3.9e-04	 t=263s	loss=0.016	
+Epoch 26/40 	 lr=3.7e-04	 t=258s	loss=0.017	
+Epoch 27/40 	 lr=3.4e-04	 t=255s	loss=0.015	
+Epoch 28/40 	 lr=3.2e-04	 t=251s	loss=0.014	
+Epoch 29/40 	 lr=2.9e-04	 t=257s	loss=0.016	
+Epoch 30/40 	 lr=2.6e-04	 t=290s	loss=0.015	val_loss=0.007 	 dice=0.9600
+Epoch 31/40 	 lr=2.4e-04	 t=299s	loss=0.015	val_loss=0.007 	 dice=0.9542
+Epoch 32/40 	 lr=2.1e-04	 t=304s	loss=0.014	val_loss=0.008 	 dice=0.9472
+Epoch 33/40 	 lr=1.8e-04	 t=303s	loss=0.014	val_loss=0.008 	 dice=0.9455
+Epoch 34/40 	 lr=1.6e-04	 t=310s	loss=0.014	val_loss=0.008 	 dice=0.9489
+Epoch 35/40 	 lr=1.3e-04	 t=293s	loss=0.014	val_loss=0.007 	 dice=0.9545
+Epoch 36/40 	 lr=1.1e-04	 t=300s	loss=0.014	val_loss=0.007 	 dice=0.9539
+Epoch 37/40 	 lr=7.9e-05	 t=291s	loss=0.014	val_loss=0.007 	 dice=0.9497
+Epoch 38/40 	 lr=5.3e-05	 t=309s	loss=0.014	val_loss=0.008 	 dice=0.9524
+Epoch 39/40 	 lr=2.6e-05	 t=301s	loss=0.014	val_loss=0.008 	 dice=0.9467
+Epoch 40/40 	 lr=0.0e+00	 t=306s	loss=0.013	val_loss=0.007 	 dice=0.9516
+
+ -> Saving weights to ../logs/2021-05-09/4/Unet_efficientnet-b1_4.pt
+
+
+    -> Validating 
+
+ - Scored 0.9474 for downscaled image b9a3865fc with threshold 0.65
+ - Scored 0.9366 for downscaled image 54f2eec69 with threshold 0.55
+ - Scored 0.9400 for downscaled image 1e2425f28 with threshold 0.60
+
+
+  ->  Dice CV : 0.938  +/- 0.019 (???)

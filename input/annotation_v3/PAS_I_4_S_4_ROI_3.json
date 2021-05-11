@@ -1,0 +1,136 @@
+[
+  {
+    "type": "Feature",
+    "id": "PathAnnotationObject",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [0, 3848],
+          [0, 4248],
+          [22, 4231],
+          [55, 4191],
+          [76, 4171],
+          [96, 4140],
+          [111, 4095],
+          [114, 4058],
+          [100, 4015],
+          [88, 3972],
+          [75, 3938],
+          [63, 3910],
+          [42, 3879],
+          [18, 3857],
+          [0, 3848]
+        ]
+      ]
+    },
+    "properties": {
+      "classification": {
+        "name": "G",
+        "colorRGB": -4596839
+      },
+      "isLocked": false,
+      "measurements": []
+    }
+  },
+  {
+    "type": "Feature",
+    "id": "PathAnnotationObject",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [10367, 634],
+          [10320, 635],
+          [10281, 660],
+          [10256, 708],
+          [10230, 757],
+          [10228, 798],
+          [10242, 869],
+          [10257, 921],
+          [10275, 963],
+          [10311, 1002],
+          [10347, 1027],
+          [10367, 1045],
+          [10367, 634]
+        ]
+      ]
+    },
+    "properties": {
+      "classification": {
+        "name": "G",
+        "colorRGB": -4596839
+      },
+      "isLocked": false,
+      "measurements": []
+    }
+  },
+  {
+    "type": "Feature",
+    "id": "PathAnnotationObject",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [9622, 0],
+          [9624, 41],
+          [9642, 102],
+          [9670, 130],
+          [9717, 165],
+          [9765, 176],
+          [9797, 160],
+          [9839, 149],
+          [9840, 149],
+          [9872, 125],
+          [9885, 94],
+          [9885, 93],
+          [9887, 93],
+          [9887, 92],
+          [9901, 53],
+          [9911, 15],
+          [9916, 1],
+          [9622, 0]
+        ]
+      ]
+    },
+    "properties": {
+      "classification": {
+        "name": "G",
+        "colorRGB": -4596839
+      },
+      "isLocked": false,
+      "measurements": []
+    }
+  },
+  {
+    "type": "Feature",
+    "id": "PathAnnotationObject",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [4694, 5102],
+          [4638, 5120],
+          [4586, 5158],
+          [4554, 5196],
+          [4875, 5196],
+          [4869, 5186],
+          [4831, 5141],
+          [4830, 5141],
+          [4781, 5115],
+          [4780, 5115],
+          [4695, 5102],
+          [4694, 5102]
+        ]
+      ]
+    },
+    "properties": {
+      "classification": {
+        "name": "G",
+        "colorRGB": -4596839
+      },
+      "isLocked": false,
+      "measurements": []
+    }
+  }
+]
