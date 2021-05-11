@@ -13,6 +13,8 @@ Our model architecture is relatively simple, and the pipeline can be easily tran
 
 You can read more about our solution [here](https://www.kaggle.com/theoviel/hubmap-final-methodology-submission/). A more concise write-up is also available [here](https://www.kaggle.com/c/hubmap-kidney-segmentation/discussion/238024).
 
+The `main` branch contains a cleaned and simplified version of our pipeline, that is enough to reproduce our solution.
+
 
 ## How to use the repository
 
@@ -23,7 +25,7 @@ You can read more about our solution [here](https://www.kaggle.com/theoviel/hubm
   - Put the competition data from [Kaggle](https://www.kaggle.com/c/hubmap-kidney-segmentation/data) in the `input`folder
   - Put the extra `Dataset A` images from [data.mendeley.com](https://data.mendeley.com/datasets/k7nvtgn2x6/3) in the `input/extra/` folder.
   - Put the [two additional images from the HubMAP portal](https://www.kaggle.com/iafoss/hubmap-ex) in the `input/test/` folder.
-  - You can download pseudo labels  from Kaggle [TODO : PROVIDE PSEUDO LABELS]
+  - You can download pseudo labels [on Kaggle](https://www.kaggle.com/theoviel/hubmap-pl/)
   - We also provide our trained model weights [on Kaggle](https://www.kaggle.com/theoviel/hubmap-cp/)
 
 - Extract the hand labels using `notebooks/Json to Mask.ipynb` :
