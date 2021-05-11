@@ -1,0 +1,124 @@
+[
+  {
+    "type": "Feature",
+    "id": "PathAnnotationObject",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [1885, 3870],
+          [1824, 3874],
+          [1781, 3904],
+          [1781, 3905],
+          [1772, 3965],
+          [1784, 4029],
+          [1826, 4057],
+          [1855, 4077],
+          [1904, 4107],
+          [1941, 4106],
+          [1980, 4088],
+          [2016, 4051],
+          [2043, 4010],
+          [2048, 3959],
+          [1996, 3896],
+          [1942, 3878],
+          [1885, 3870]
+        ]
+      ]
+    },
+    "properties": {
+      "classification": {
+        "name": "FC",
+        "colorRGB": -1296326
+      },
+      "isLocked": false,
+      "measurements": []
+    }
+  },
+  {
+    "type": "Feature",
+    "id": "PathAnnotationObject",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [9550, 0],
+          [9575, 63],
+          [9628, 121],
+          [9693, 144],
+          [9771, 131],
+          [9821, 93],
+          [9868, 60],
+          [9898, 0],
+          [9550, 0]
+        ]
+      ]
+    },
+    "properties": {
+      "classification": {
+        "name": "G",
+        "colorRGB": -4596839
+      },
+      "isLocked": false,
+      "measurements": []
+    }
+  },
+  {
+    "type": "Feature",
+    "id": "PathAnnotationObject",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [10459, 5974],
+          [10432, 6015],
+          [10414, 6053],
+          [10403, 6105],
+          [10402, 6158],
+          [10421, 6207],
+          [10425, 6207],
+          [10459, 6241],
+          [10459, 5974]
+        ]
+      ]
+    },
+    "properties": {
+      "classification": {
+        "name": "G",
+        "colorRGB": -4596839
+      },
+      "isLocked": false,
+      "measurements": []
+    }
+  },
+  {
+    "type": "Feature",
+    "id": "PathAnnotationObject",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [10145, 0],
+          [10153, 37],
+          [10172, 84],
+          [10206, 118],
+          [10259, 145],
+          [10319, 154],
+          [10360, 138],
+          [10407, 100],
+          [10460, 74],
+          [10460, 0],
+          [10145, 0]
+        ]
+      ]
+    },
+    "properties": {
+      "classification": {
+        "name": "G",
+        "colorRGB": -4596839
+      },
+      "isLocked": false,
+      "measurements": []
+    }
+  }
+]

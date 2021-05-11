@@ -1,0 +1,35 @@
+[
+  {
+    "type": "Feature",
+    "id": "PathAnnotationObject",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [3094, 4225],
+          [3056, 4243],
+          [3010, 4279],
+          [2988, 4339],
+          [3012, 4383],
+          [3062, 4404],
+          [3107, 4401],
+          [3131, 4392],
+          [3165, 4373],
+          [3187, 4344],
+          [3178, 4291],
+          [3175, 4291],
+          [3145, 4245],
+          [3094, 4225]
+        ]
+      ]
+    },
+    "properties": {
+      "classification": {
+        "name": "G",
+        "colorRGB": -4596839
+      },
+      "isLocked": false,
+      "measurements": []
+    }
+  }
+]
