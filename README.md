@@ -30,7 +30,7 @@ Our pipeline achieves highly competitive performance on the task, because of the
 - It uses intelligent tiling, compatible with every segmentation task on big images.
   - We sample only interesting regions, using mask and tissue information
   - Tiling is made on the fly, on previously resized images for efficiency.
-  - Augmentations are made in slightly bigger sizes to get rid of side effects
+  - Augmentations are made on slightly bigger tiles to get rid of side effects
 - It is adapted to the specificity of the problem, to better tackle its complexity :
   - We added another class to the problem : unhealthy glomeruli
   - We manually annotated external data, as well as missing masks in the training data using model feedback.
