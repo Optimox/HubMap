@@ -1,10 +1,13 @@
-## 4th place solution to the HuBMAP - Hacking the Kidney Kaggle Competition
+# 4th place solution to the HuBMAP - Hacking the Kidney Kaggle Competition
 #### Authors : [@theoviel](https://github.com/theoviel), [@optimox](https://github.com/Optimox), [@iafoss](https://github.com/iafoss)
 
 #### Status :
 - Document code : Done
 - Clean notebooks : Done
-- Make ReadMe : WIP
+- Make ReadMe : Almost Done
+- Add the code for glomeruli level metrics : WIP
+- Add images : TODO
+
 
 ## Introduction
 
@@ -14,6 +17,36 @@ Our model architecture is relatively simple, and the pipeline can be easily tran
 You can read more about our solution [here](https://www.kaggle.com/theoviel/hubmap-final-methodology-submission/). A more concise write-up is also available [here](https://www.kaggle.com/c/hubmap-kidney-segmentation/discussion/238024).
 
 The `main` branch contains a cleaned and simplified version of our pipeline, that is enough to reproduce our solution.
+
+
+## Overview
+
+Our pipeline achieves highly competitive performance on the task, because of the following aspects :
+- It allows for fast experimenting and results interpretation:
+  - Pre-computation of resized images and masks of the desired size for short dataset preparation times
+  - Uses half-precision for faster training
+  - Interractive visualization of predicted masks in notebooks
+  - Glomeruli level metrics and confidence to understand the flaws of the model [TODO : Add code]
+- It uses intelligent tiling, compatible with every segmentation task on big images.
+  - We sample only interesting regions, using mask and tissue information
+  - Tiling is made on the fly, on previously resized images for efficiency.
+  - Augmentations are made in slightly bigger sizes to get rid of side effects
+- It is adaptated to the specificity of the problem, to better tackle its complexity :
+  - We added another class to the problem : unhealthy glomeruli
+  - We manually annotated external data, as well as missing masks in the training data using model feedback.
+  - Aggressive augmentations help the model generalize well to quality issues in the test data
+
+
+For the following reasons, our code is convenient to use, especially for researchers :
+- It is only based on comonly used and reliable libraries:
+  - [PyTorch](https://pytorch.org/)
+  - [Albumentations](https://albumentations.ai/) for augmentations
+  - [Segmentations Models PyTorch](https://github.com/qubvel/segmentation_models.pytorch) for modeling
+- It is easily re-usable:
+  - It is documented and formated 
+  - It includes best-practices from top Kagglers, who also have experience in research and in the industry
+  - It is (relatively) low level, which means one can independantly use each brick of our pipeline in their code
+  - We applied our pipeline to keratinocytes segmentation in LC-OCT and quickly achieved good results. See [here](https://www.kaggle.com/theoviel/hubmap-final-methodology-submission/) for more information.
 
 
 ## How to use the repository
