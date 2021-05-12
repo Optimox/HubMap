@@ -11,7 +11,7 @@
 
 ## Introduction
 
-Our approach is built on understanding the challenges behind the data. Our main contribution is the consideration if the link between healthy glomeruli and unhealthy ones by predicting both into two different classes. We incorporate several external datasets in our pipeline and manually annotated the two classes.
+Our approach is built on understanding the challenges behind the data. Our main contribution is the consideration of the link between healthy glomeruli and unhealthy ones by predicting both into two different classes. We incorporate several external datasets in our pipeline and manually annotated the two classes.
 Our model architecture is relatively simple, and the pipeline can be easily transferred to other tasks.
 
 You can read more about our solution [here](https://www.kaggle.com/theoviel/hubmap-final-methodology-submission/). A more concise write-up is also available [here](https://www.kaggle.com/c/hubmap-kidney-segmentation/discussion/238024).
@@ -45,7 +45,7 @@ For the following reasons, our code is convenient to use, especially for researc
 - It is easily re-usable:
   - It is documented and formated 
   - It includes best-practices from top Kagglers, who also have experience in research and in the industry
-  - It is (relatively) low level, which means one can independantly use each brick of our pipeline in their code
+  - It is (relatively) low level, which means one can independently use each brick of our pipeline in their code
   - We applied our pipeline to keratinocytes segmentation in LC-OCT and quickly achieved good results. See [here](https://www.kaggle.com/theoviel/hubmap-final-methodology-submission/) for more information.
 
 
