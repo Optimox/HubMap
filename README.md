@@ -25,25 +25,25 @@ Our pipeline achieves highly competitive performance on the task, because of the
 - It allows for fast experimenting and results interpretation:
   - Pre-computation of resized images and masks of the desired size for short dataset preparation times
   - Uses half-precision for faster training
-  - Interractive visualization of predicted masks in notebooks
+  - Interactive visualization of predicted masks in notebooks
   - Glomeruli level metrics and confidence to understand the flaws of the model [TODO : Add code]
 - It uses intelligent tiling, compatible with every segmentation task on big images.
   - We sample only interesting regions, using mask and tissue information
   - Tiling is made on the fly, on previously resized images for efficiency.
   - Augmentations are made in slightly bigger sizes to get rid of side effects
-- It is adaptated to the specificity of the problem, to better tackle its complexity :
+- It is adapted to the specificity of the problem, to better tackle its complexity :
   - We added another class to the problem : unhealthy glomeruli
   - We manually annotated external data, as well as missing masks in the training data using model feedback.
   - Aggressive augmentations help the model generalize well to quality issues in the test data
 
 
 For the following reasons, our code is convenient to use, especially for researchers :
-- It is only based on comonly used and reliable libraries:
+- It is only based on commonly used and reliable libraries:
   - [PyTorch](https://pytorch.org/)
   - [Albumentations](https://albumentations.ai/) for augmentations
   - [Segmentations Models PyTorch](https://github.com/qubvel/segmentation_models.pytorch) for modeling
 - It is easily re-usable:
-  - It is documented and formated 
+  - It is documented and formatted 
   - It includes best-practices from top Kagglers, who also have experience in research and in the industry
   - It is (relatively) low level, which means one can independently use each brick of our pipeline in their code
   - We applied our pipeline to keratinocytes segmentation in LC-OCT and quickly achieved good results. See [here](https://www.kaggle.com/theoviel/hubmap-final-methodology-submission/) for more information.
@@ -55,7 +55,7 @@ For the following reasons, our code is convenient to use, especially for researc
 - [TODO : Requirements]
 
 - Download the data :
-  - Put the competition data from [Kaggle](https://www.kaggle.com/c/hubmap-kidney-segmentation/data) in the `input`folder
+  - Put the competition data from [Kaggle](https://www.kaggle.com/c/hubmap-kidney-segmentation/data) in the `input` folder
   - Put the extra `Dataset A` images from [data.mendeley.com](https://data.mendeley.com/datasets/k7nvtgn2x6/3) in the `input/extra/` folder.
   - Put the [two additional images from the HubMAP portal](https://www.kaggle.com/iafoss/hubmap-ex) in the `input/test/` folder.
   - You can download pseudo labels [on Kaggle](https://www.kaggle.com/theoviel/hubmap-pl/)
@@ -102,7 +102,7 @@ For the following reasons, our code is convenient to use, especially for researc
 
 - Validate models with `notebooks/Inference.ipynb` :
   - Use the `log_folder` parameter to specify the experiment.
-  - Use the `use_tta` parameter to speciy whether to use test time augmentations.
+  - Use the `use_tta` parameter to specify whether to use test time augmentations.
   - Use the `save` parameter to indicate whether to save predictions.
   - Use the `save_all_tta` parameter to save predictions for each tta (takes a lot of disk space).
   - Use the `global_threshold` parameter to tweak the threshold.
