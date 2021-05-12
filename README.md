@@ -28,16 +28,17 @@ The `main` branch contains a cleaned and simplified version of our pipeline, tha
   - You can download pseudo labels [on Kaggle](https://www.kaggle.com/theoviel/hubmap-pl/)
   - We also provide our trained model weights [on Kaggle](https://www.kaggle.com/theoviel/hubmap-cp/)
 
-- Extract the hand labels using `notebooks/Json to Mask.ipynb` :
-  - Use the `ADD_FC` and `ONLY_FC` parameters to generate labels for the healthy and unhealthy classes.
-  - Use the `SAVE_TIFF `parameter to save the external data as tiff files of half resolution.
-  - Use the `PLOT` parameter to visualize the masks.
-  - Use the `SAVE` parameter to save the masks as rle.
-
-- Create lower resolution masks and images using `notebooks/Image downscaling.ipynb` :
-  - Use the `FACTOR` parameter to specify the downscaling factor. We recommend generating data of downscaling 2 and 4.
-  - For training data, we save extra time by also computing downscaling rles. Use the `NAME` parameter to specify which rle to downscale.
-  - It is only require to save the downscaled images once, use the `SAVE_IMG` parameters to this extent.
+- Prepare the data :
+  - Extract the hand labels using `notebooks/Json to Mask.ipynb` :
+    - Use the `ADD_FC` and `ONLY_FC` parameters to generate labels for the healthy and unhealthy classes.
+    - Use the `SAVE_TIFF `parameter to save the external data as tiff files of half resolution.
+    - Use the `PLOT` parameter to visualize the masks.
+    - Use the `SAVE` parameter to save the masks as rle.
+  - Create lower resolution masks and images using `notebooks/Image downscaling.ipynb` :
+    - Use the `FACTOR` parameter to specify the downscaling factor. We recommend generating data of downscaling 2 and 4.
+    - For training data, we save extra time by also computing downscaling rles. Use the `NAME` parameter to specify which rle to downscale. Make sure to run the script for all the dataframes you want to use.
+    - It is only require to save the downscaled images once, use the `SAVE_IMG` parameters to this extent.
+  - The process is a bit time-consuming, but only requires to be done once. This allows for faster experimenting : loading and downscaling the images when building the dataset takes a while, so we don't want to do it every time. 
 
 - Train models using `notebooks/Training.ipynb`
   - Use the `DEBUG` parameter to launch the code in debug mode (single fold, no logging)
