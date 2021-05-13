@@ -423,7 +423,6 @@ class InMemoryTrainDataset(Dataset):
         if self.masks_test[image_nb][mid_x - m: mid_x + m, mid_y - m: mid_y + m].max() > 0.9:
             return True
 
-
         should_keep = np.random.rand()
         if should_keep > self.sampling_thresh:
             return True
