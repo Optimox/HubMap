@@ -244,13 +244,14 @@ class InMemoryTrainDataset(Dataset):
         self.soft_labels = soft_labels
         self.use_pseudo_label = use_pseudo_label
         self.pseudo_images_names = np.array(
-                                        ["57512b7f1",
-                                        "d488c759a",
-                                        "aa05346ff",
-                                        "3589adb90",
-                                        "2ec3f1bb9",
-                                        "VAN0011-RK-3-10-PAS_registered.ome",
-                                        "VAN0003-LK-32-21-PAS_registered.ome",
+                                        [
+                                        # "57512b7f1",
+                                        # "d488c759a",
+                                        # "aa05346ff",
+                                        # "3589adb90",
+                                        # "2ec3f1bb9",
+                                        # "VAN0011-RK-3-10-PAS_registered.ome",
+                                        # "VAN0003-LK-32-21-PAS_registered.ome",
                                         ] 
         )
         self.extra_df = pd.read_csv('../input/external_data/theos_tiff/train_extra.csv')

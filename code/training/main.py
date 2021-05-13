@@ -91,12 +91,19 @@ def validate(model, config, val_images):
         config (Config): Model config.
         val_images (list of strings): Validation image ids.
     """
-    rles = pd.read_csv(DATA_PATH + f"train_{config.reduce_factor}.csv")
+    if config.reduce_factor==1:
+        rles = pd.read_csv(DATA_PATH + f"train.csv")
+        path_to_images=f"{DATA_PATH}train"
+    else:
+        rles = pd.read_csv(DATA_PATH + f"train_{config.reduce_factor}.csv")
+        path_to_images=f"{DATA_PATH}train_{config.reduce_factor}"
     scores = []
+
+
     for img in val_images:
 
         predict_dataset = InferenceDataset(
-            f"{DATA_PATH}train_{config.reduce_factor}/{img}.tiff",
+            f"{path_to_images}/{img}.tiff",
             rle=rles[rles["id"] == img]["encoding"],
             overlap_factor=config.overlap_factor,
             tile_size=config.tile_size,
@@ -135,7 +142,12 @@ def k_fold(config, log_folder=None):
     print("Creating in-memory dataset ...")
 
     start_time = time.time()
-    df_rle = pd.read_csv(f"../input/train_new_{config.reduce_factor}.csv")
+    if config.reduce_factor==1:
+        df_rle = pd.read_csv(f"../input/train_new.csv")
+        train_path=f"../input/train/"
+    else:
+        df_rle = pd.read_csv(f"../input/train_new_{config.reduce_factor}.csv")
+        train_path=f"../input/train_{config.reduce_factor}/"
     train_img_names = df_rle.id.unique()
 
     in_mem_dataset = InMemoryTrainDataset(
@@ -145,7 +157,7 @@ def k_fold(config, log_folder=None):
         reduce_factor=config.reduce_factor,
         train_transfo=HE_preprocess(size=config.tile_size),
         valid_transfo=HE_preprocess(augment=False, size=config.tile_size),
-        train_path=f"../input/train_{config.reduce_factor}/",
+        train_path=train_path,
         iter_per_epoch=config.iter_per_epoch,
         on_spot_sampling=config.on_spot_sampling,
         sampling_mode=config.sampling_mode,
@@ -161,16 +173,16 @@ def k_fold(config, log_folder=None):
 
         meter, history, model = train(config, in_mem_dataset, i, log_folder=log_folder)
 
-        print("\n    -> Validating \n")
+        # print("\n    -> Validating \n")
 
-        val_images = in_mem_dataset.valid_set
-        scores += validate(model, config, val_images)
+        # val_images = in_mem_dataset.valid_set
+        # scores += validate(model, config, val_images)
 
-        if log_folder is not None:
-            history.to_csv(log_folder + f"history_{i}.csv", index=False)
+        # if log_folder is not None:
+        #     history.to_csv(log_folder + f"history_{i}.csv", index=False)
 
-        if log_folder is None or len(config.selected_folds) == 1:
-            return meter
+        # if log_folder is None or len(config.selected_folds) == 1:
+        #     return meter
 
         del meter, model
         torch.cuda.empty_cache()
