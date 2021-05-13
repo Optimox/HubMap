@@ -5,8 +5,8 @@
 - Document code : Done
 - Clean notebooks : Done
 - Make ReadMe : Almost Done
-- Add the code for glomeruli level metrics : WIP
-- Add images : TODO
+- Add the code for individual differences : WIP
+- Clean code for glomeruli level metrics : WIP
 
 
 ## Introduction
@@ -20,6 +20,8 @@ The `main` branch contains a cleaned and simplified version of our pipeline, tha
 
 
 ## Overview
+
+![](overview.png)
 
 Our pipeline achieves highly competitive performance on the task, because of the following aspects :
 - It allows for fast experimenting and results interpretation:
@@ -148,7 +150,3 @@ code
 │   └── torch.py        # Torch utils
 └── params.py           # Main parameters
 ``` 
-
-
-
-[WIP]
